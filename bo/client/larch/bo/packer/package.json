@@ -1,0 +1,8 @@
+{
+  "devDependencies": {
+    "parcel": "latest"
+  },
+  "scripts": {
+    "prebuild": "rm -rf dist"
+  }
+}
