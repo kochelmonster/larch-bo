@@ -1,1 +1,3 @@
-.lfrontend*
+.lfrontend
+__pycache__
+*.egg-info
