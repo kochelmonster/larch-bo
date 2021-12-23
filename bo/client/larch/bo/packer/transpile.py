@@ -1,8 +1,8 @@
-import os
 import re
 import subprocess
 import logging
 import json
+import shutil
 from pathlib import Path
 
 logger = logging.getLogger("larch.bo.packer")
@@ -61,7 +61,7 @@ def make(linker):
     if transpile(linker):
         raise RuntimeError("Error transpiling")
 
-    build_aliases(linker)
+    copy_resources(linker)
 
 
 def extend_manifest(linker):
@@ -89,10 +89,10 @@ def read_project_file(linker):
         return json.load(f)
 
 
-def build_aliases(linker):
+def copy_resources(linker):
     data = read_project_file(linker)
     linker.context["python_sources"] = set(m["source"] for m in data["modules"])
-    linker.context["python_aliases"] = aliases = {}
+    linker.context["resources"] = resources = set()
     for m in data["modules"]:
         spath = Path(m["source"])
         with open(spath, "r") as f:
@@ -101,13 +101,20 @@ def build_aliases(linker):
         dirpath = spath.parent
         for found in require_replace.finditer(source):
             require = found.group(1)
-            dstpath = os.path.relpath(str(dirpath/require), str(spath))
-            aliases[require] = str(dstpath)
+            require_path = dirpath/require
+            if not require_path.exists():
+                # a global package
+                continue
+
+            dest_path = linker.path/require
+            resources.add(str(require_path))
+            if not dest_path.exists() or require_path.stat().st_mtime > dest_path.stat().st_mtime:
+                shutil.copy(require_path, dest_path)
 
 
 def watch(linker, wait_for_change):
     while True:
-        build_aliases(linker)
-        sources = linker.context["python_sources"]
+        copy_resources(linker)
+        sources = linker.context["python_sources"] | linker.context["resources"]
         wait_for_change(sources)
         transpile(linker)

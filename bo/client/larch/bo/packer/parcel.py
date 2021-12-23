@@ -11,44 +11,38 @@ logger = logging.getLogger("larch.bo.packer")
 
 DIR = Path(__file__).resolve().parent
 
-NEEDED_PACKAGES = """
-parcel
-"""
+NEEDED_PACKAGES = ["parcel"]
+
 
 require_replace = re.compile("require.*\"(.*?)\"")
 
 
 def init(config):
     start = Path(config["root"]).parent
-    packages = NEEDED_PACKAGES.strip().split()
-    for p in packages:
+    for p in NEEDED_PACKAGES:
         logger.debug("init package %r", p)
         npm_make(p, start)
 
 
 def make_package_json(linker):
-    if "python_aliases" in linker.context:
-        template = "package.json"
-        template = linker.config.get("parcel_config", DIR/template)
-        if Path(template).exists():
-            with open(template, "r") as f:
-                template = f.read()
+    template = "package.json"
+    template = linker.config.get("parcel_config", DIR/template)
+    if Path(template).exists():
+        with open(template, "r") as f:
+            template = f.read()
 
-        package = json.loads(template)
-        package["name"] = linker.config.get("name", Path(linker.config["root"]).name)
-        package["alias"] = linker.context["python_aliases"]
+    package = json.loads(template)
+    package["name"] = linker.config.get("name", Path(linker.config["root"]).name)
 
-        with open(linker.path/"package.json", "w") as f:
-            f.write(json.dumps(package, indent=2))
-        return True
-    return False
+    with open(linker.path/"package.json", "w") as f:
+        f.write(json.dumps(package, indent=2))
 
 
 def make(linker):
     logger.info("make parcel %r\n%r", linker.path, linker.config)
 
     make_package_json(linker)
-    # name = linker.path/Path(linker.config["root"]).name.replace(".py", ".js")
+
     name = linker.path/"index.html"
     cmd = (f'npx parcel build {name} --dist-dir {linker.config["resources_path"]} '
            '--log-level=verbose')

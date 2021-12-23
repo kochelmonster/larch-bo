@@ -14,6 +14,7 @@ def compile_resources(config, force):
 
 
 def start_watcher(config, wait_for_change):
+    parcel.init(config)
     linker_ = linker.Linker(config, False, False)
     transpile.make(linker_)
     parcel.make_package_json(linker_)
