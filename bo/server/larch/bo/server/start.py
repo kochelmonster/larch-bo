@@ -103,7 +103,7 @@ def run(root, application=None, config=None, **config_args):
 
     if os.environ.get("ANDROID_APP_PATH"):
         config["runtype"] = "android"
-        config["heartbeat"] = 0  # not needed
+        config["wsheartbeat"] = 0  # not needed
         return run_android(application, config)
 
     adjust_profiling(args)
@@ -116,7 +116,7 @@ def run(root, application=None, config=None, **config_args):
     if type_ == 'local':  # pragma: no cover
         from .extra.electron import run_electron
         config["runtype"] = "local"
-        config["heartbeat"] = 0  # websocket heartbeat not needed
+        config["wsheartbeat"] = 0  # websocket heartbeat not needed
         if config.get("debug", False):
             check_for_compile(config)
         return run_electron(application, config)
