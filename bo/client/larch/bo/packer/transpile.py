@@ -3,6 +3,7 @@ import subprocess
 import logging
 import json
 import shutil
+import sys
 from pathlib import Path
 
 logger = logging.getLogger("larch.bo.packer")
@@ -37,10 +38,40 @@ def additional_directories():
     return dirs
 
 
+def transpile_worker(linker):
+    # transpile webworkers
+    if "larch.bo.client.server.xtransmitter" in sys.modules:
+        worker = "ajax"
+    elif "larch.bo.client.server.stransmitter" in sys.modules:
+        worker = "socket"
+    elif "larch.bo.client.server.atransmitter" in sys.modules:
+        worker = "api"
+    else:
+        return
+
+    linker.worker = worker + ".js"
+    path = Path(sys.modules["larch.bo.client.server"].__file__).parent/(worker+".py")
+    worker_path = linker.path/"worker"
+    # compile ajax worker
+    print("transpile", worker)
+    cmd = f'python -m transcrypt --nomin --map --verbose -od {worker_path} {path}'
+    print(cmd)
+    result = subprocess.run(
+        cmd, shell=True, stderr=subprocess.STDOUT,
+        stdout=subprocess.PIPE, encoding="utf8")
+
+    for line in result.stdout:
+        sys.stdout.write(line)
+        sys.stdout.flush()
+
+    if result.returncode:
+        raise RuntimeError("Error transpiling ajax")
+
+
 def transpile(linker):
     logger.info("transpile python %r\n%r", linker.path, linker.config)
-    cmd = f'python -m transcrypt --nomin --map --verbose -od {linker.path} {linker.config["root"]}'
 
+    cmd = f'python -m transcrypt --nomin --map --verbose -od {linker.path} {linker.config["root"]}'
     dirs = list(linker.config.get("extra_search_path", [])) + additional_directories()
     if dirs:
         dirs = "$".join(d.replace(" ", "#") for d in dirs)
@@ -48,19 +79,23 @@ def transpile(linker):
 
     print(cmd)
     result = subprocess.run(
-        cmd, shell=True, cwd=linker.path, stderr=subprocess.STDOUT,
+        cmd, shell=True, stderr=subprocess.STDOUT,
         stdout=subprocess.PIPE, encoding="utf8")
-    print(result.stdout)
-    return result.returncode
+    for line in result.stdout:
+        sys.stdout.write(line)
+        sys.stdout.flush()
+
+    if result.returncode:
+        raise RuntimeError("Error transpiling")
+
+    transpile_worker(linker)
 
 
 def make(linker):
     if not needs_transpile(linker):
         return
 
-    if transpile(linker):
-        raise RuntimeError("Error transpiling")
-
+    transpile(linker)
     copy_resources(linker)
 
 

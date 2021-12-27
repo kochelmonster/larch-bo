@@ -1,5 +1,6 @@
 """interface to webpack manager"""
 import re
+import sys
 import json
 import subprocess
 import logging
@@ -38,9 +39,41 @@ def make_package_json(linker):
         f.write(json.dumps(package, indent=2))
 
 
+def patch_msgpack(script):
+    """
+    msgpack-lite does not work well with parcel == we have to patch the output
+    """
+    script.write_text(script.read_text().replace(".global", ".$parcel$global"))
+
+
+def make_worker(linker):
+    if linker.worker is None:
+        return
+
+    name = linker.path/"worker"/linker.worker
+    cmd = f'npx parcel build {name} --dist-dir {linker.config["resources_path"]}'
+    if linker.config.get("debug"):
+        cmd += " --no-optimize"
+
+    result = subprocess.run(
+        cmd, shell=True, cwd=linker.path, stderr=subprocess.STDOUT,
+        stdout=subprocess.PIPE, encoding="utf8")
+
+    print(cmd)
+    for line in result.stdout:
+        sys.stdout.write(line)
+        sys.stdout.flush()
+
+    if result.returncode:
+        raise RuntimeError("Error packing worker")
+
+    patch_msgpack(linker.config["resources_path"]/name.name)
+
+
 def make(linker):
     logger.info("make parcel %r\n%r", linker.path, linker.config)
 
+    make_worker(linker)
     make_package_json(linker)
 
     name = linker.path/"index.html"
@@ -55,7 +88,9 @@ def make(linker):
         stdout=subprocess.PIPE, encoding="utf8")
 
     print(cmd)
-    print(result.stdout)
+    for line in result.stdout:
+        sys.stdout.write(line)
+        sys.stdout.flush()
     if result.returncode:
         raise RuntimeError("Error completing bundler")
 
