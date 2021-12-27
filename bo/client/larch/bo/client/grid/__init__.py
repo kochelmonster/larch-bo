@@ -1,12 +1,15 @@
 import re
 from larch.reactive import rule, Pointer, Cell
 from ..textlayout import DOMCell, Empty, AlignedCell, Parser, Stretcher, RowSpan, walk_pointer
-from ..control import Control, ControlContext, create_control_factory, NullControl
-from ..browser import create_element
-# from ..tools import ascii_inc
+from ..control import Control, ControlContext, create_control_factory
 
+# TODO: splitter handling (min(min-content, px)) https://stackoverflow.com/questions/46931103/making-a-dragbar-to-resize-divs-inside-css-grids#46934825
+# TODO: Save state
+# TODO: i18n
+# TODO: CSS animation
 
 # __pragma__("skip")
+document = None
 def require(n): pass
 # __pragma__ ("noskip")
 
@@ -22,27 +25,26 @@ class FieldContext(ControlContext):
         self.options["name"] = cell.name
         self.control = None
         self.old_control_key = None
+        self.options["id"] = self.parent["id"] + "." + cell.name
 
     def control_key(self):
         t = type(self.value)
         style = self['style']  # __: opov
         return f"{t.__name__}:{t.__module__}-{style}" if t else None
 
-    @rule
+    @rule(-1)
     def _rule_render_control(self):
         if self.element is None:
             return
 
         key = self.control_key()
         if key != self.old_control_key:
+            if self.control is not None:
+                self.control.unlink()
             yield
             self.old_control_key = key
-            control_factory = create_control_factory(self)
-            if control_factory:
-                self.control = control_factory(self)
-            else:
-                self.control = NullControl(self)
-
+            self.control = create_control_factory(self)
+            self.element.innerHTML = ""
             self.control.render(self.element)
 
 
@@ -70,7 +72,7 @@ class Label(AlignedCell):
         return {}
 
     def render(self, grid):
-        grid.contexts[self.name]["element"] = el = create_element("label")
+        grid.contexts[self.name]["element"] = el = document.createElement("label")
         el.innerHTML = self.text
         self.set_style(el.style)
         grid.element.appendChild(el)
@@ -82,7 +84,7 @@ class Field(AlignedCell):
         + "([<>v^]+)?"            # label position
         + r"(\[(.+)\])"           # value_proxy path
         + AlignedCell.REGEXP      # alignment
-        + r"(\{(-?\d*)\})?"       # tabindex
+        + r"(\{(\d*)\})?"         # tabindex
         + r"(#([\w_:.-]+))?"      # dom id
         + r"(@([\w_.-]+))?"       # style
         + "([*]?)")               # autofocus
@@ -101,10 +103,9 @@ class Field(AlignedCell):
             tmp.name = tmp.path.split(".")[-1]  # __: opov
 
         tmp.alignment = mo.group(6) or ""
-        try:
-            tmp.tabindex = int(mo.group(8) or 0)
-        except ValueError:
-            tmp.tabindex = None
+        tmp.tabindex = mo.group(8)
+        if tmp.tabindex is not None:
+            tmp.tabindex = int(tmp.tabindex)
         tmp.view_id = mo.group(10)
         tmp.style = mo.group(12)
         tmp.autofocus = bool(mo.group(13))
@@ -115,7 +116,7 @@ class Field(AlignedCell):
         return FieldContext(walk_pointer(pointer, self.path), grid.context, self)
 
     def render(self, grid):
-        el = create_element("div")
+        el = document.createElement("div")
         self.set_style(el.style)
         grid.element.appendChild(el)
         grid.contexts[self.name].element = el
@@ -139,7 +140,7 @@ class Spacer(DOMCell):
         return
 
     def render(self, grid):
-        el = create_element("div")
+        el = document.createElement("div")
         el.style.width = self.width
         el.style.height = self.height
         self.set_style(el.style)
@@ -159,26 +160,45 @@ class Grid(Control):
     state_to_location (in) if True the layout saves its state into the location. (default: True).
     domain (in)            Translation domain, default: label.
     """
-    # TODO: tabindex handling
-    # TODO: splitter handling (min(min-content, px)) https://stackoverflow.com/questions/46931103/making-a-dragbar-to-resize-divs-inside-css-grids#46934825
 
     layout_cache = {}
     element = None
 
+    def __init__(self, context_or_value=None):
+        super().__init__(context_or_value)
+        if not self.context["id"]:
+            self.context["id"] = self.__class__.__name__
+
     def _make_cells(self):
-        self.cells = self.__class__.layout_cache.get(self.layout)
-        if self.cells is None:
-            self.cells = {}
+        parsed = self.__class__.layout_cache.get(self.layout)
+        if parsed is None:
+            tindex = 1000
+            parsed = {}
+            parsed.fields = []
+            parsed.cells = {}
             parser = GridParser(self.layout)
             for row in parser.rows:
                 for c in row:
-                    self.cells[c.name] = c
+                    parsed.cells[c.name] = c
+                    if isinstance(c, Field):
+                        if c.tabindex is None:
+                            c.tabindex = tindex
+                            tindex += 1
+                        parsed.fields.append(c)
 
-            self.__class__.layout_cache[self.layout] = self.cells
-            self.column_count = parser.column_count
-            self.row_count = parser.row_count
-            self.column_stretchers = parser.column_stretchers
-            self.row_stretchers = parser.row_stretchers
+            parsed.fields.sort(lambda c: int(c.tabindex))
+            parsed.column_count = parser.column_count
+            parsed.row_count = parser.row_count
+            parsed.column_stretchers = parser.column_stretchers
+            parsed.row_stretchers = parser.row_stretchers
+            self.__class__.layout_cache[self.layout] = parsed
+
+        self.fields = parsed.fields
+        self.cells = parsed.cells
+        self.column_count = parsed.column_count
+        self.row_count = parsed.row_count
+        self.column_stretchers = parsed.column_stretchers
+        self.row_stretchers = parsed.row_stretchers
 
         self.contexts = {}
         for name, c in self.cells.items():
@@ -190,9 +210,22 @@ class Grid(Control):
         return self.cells
 
     def render(self, parent):
-        self.element = create_element("div")
+        self.element = document.createElement("div")
         parent.appendChild(self.element)
         self.render_to_dom()
+
+    def iter_fields_controls(self):
+        for f in self.fields:
+            ctx = self.contexts[f.name]
+            if ctx and ctx.control is not None:
+                yield ctx.control
+
+    def unlink(self):
+        super().unlink()
+        self.element = None
+        for ctrl in self.iter_fields_controls():
+            ctrl.context.control = None
+            ctrl.unlink()
 
     def render_to_dom(self):
         element = self.element
@@ -212,11 +245,25 @@ class Grid(Control):
 
         self.modify_controls()
 
+        session = self.context["session"]  # __: opov
+        if session is not None:
+            session.update_tabindex()
+
     def prepare_contexts(self):
         pass
 
     def modify_controls(self):
         pass
+
+    def celement(self, name):
+        """short for self.contexts[name].control.element"""
+        return self.contexts[name].control.element
+
+    def get_tab_elements(self):
+        elements = []
+        for ctrl in self.iter_fields_controls():
+            elements.extend(ctrl.get_tab_elements())
+        return elements
 
     @rule
     def _rule_update_cells(self):
