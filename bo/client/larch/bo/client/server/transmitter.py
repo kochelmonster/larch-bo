@@ -1,11 +1,11 @@
 import time
 
-
 # __pragma__("skip")
 Object = window = None
 def __pragma__(*args): pass
 def create_promise(): pass
 def as_array(): pass
+def create_worker(): pass
 # __pragma__("noskip")
 
 
@@ -13,7 +13,6 @@ __pragma__('js', '{}', '''
 function create_promise(call_back) {
     return new Promise(call_back);
 }
-
 
 function as_array(pyobj) {
     return Array.from(pyobj);
@@ -128,3 +127,20 @@ class Transmitter:
             request = self.active_requests.get(obj["id"], None)
             if request:
                 request._receive(obj["item"])
+
+
+__pragma__("ecom")
+__pragma__("ifdef", "ajax")
+"""?
+from .xtransmitter import create_worker
+?"""
+__pragma__("else")
+"""?
+from .stransmitter import create_worker
+?"""
+__pragma__("endif")
+
+
+def set_tmt(session):
+    window.transmitter = Transmitter(create_worker())
+    session.extern = window.transmitter.api

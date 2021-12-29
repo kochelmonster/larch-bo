@@ -1,83 +1,178 @@
 # import larch.lib.adapter as adapter
-import larch.bo.client.polymer
+from larch.bo.client.vaadin.vinput import register as input_register
+from larch.bo.client.vaadin.vbutton import register as button_register
 from larch.bo.client.grid import Grid
-from larch.bo.client.control import ControlContext, Control, register
+from larch.bo.client.session import Session
+from larch.bo.client.control import BODY
+from larch.bo.client.qt import create_window_container, calc_minsize
 from larch.reactive import Cell, rule
-from larch.bo.client.browser import create_element
 
 # __pragma__("skip")
+# ---------------------------------------------------
+import os
 import sys
+from gevent import sleep
+from logging import getLogger
 from larch.lib.test import config_logging
-from larch.bo.server import run
+# from larch.bo.server import run
+from larch.bo.qt import run
 from pathlib import Path
 
-larch.bo.client.polymer
-window = document = None
+window = document = console = None
+logger = getLogger("main")
+def require(path): pass
+def __pragma__(*args): pass
+
+
+class GridApi:
+    def get_data(self, count):
+        for i in range(10):
+            yield [{"name": "test"}] * count
+            sleep(1)
 
 
 if __name__ == "__main__":
-    config_logging("grid.log", __file__)
+    config_logging(os.environ.get("LARCH_BO_QT_FRONTEND_STARTED", "qt")+"-grid.log", __file__)
     dir_ = Path(__file__).parent
     config = {
         "debug": True,
+        "api": GridApi(),
+        "transmitter": "socket",
+        "window": {
+            "frameless": False,
+            "width": 0,
+            "height": 0,
+        }
     }
     sys.exit(run(__file__, config=config))
+# ---------------------------------------------------
 # __pragma__ ("noskip")
+
+require("./grid.scss")
+input_register()
+button_register()
+
+
+class Frame(Grid):
+    layout = """
+(1px,1px)                          |<1>
+(1px,1px)|[.content]|(1px,1px)
+bottom:this is some button test{cb}|<1>
+  <1>    |          | <1>
+"""
+
+    def __init__(self, context=None):
+        super().__init__(context)
+        self.content = TestGrid()
 
 
 class TestGrid(Grid):
     layout = """
 lvalue:Value{r}|[.value]{l}
-               |[.submit]
-bottom:this is some button test{cb}|<1>
+               |[.to_text]
+               |[.to_number]
+               |[.to_form]
+               |[.from_server]
+               |[.abort]
+               |[.calc_minsize]
+[.output]@text
     <1>        |<1>
 """
 
     value = Cell("Test")
+    output = Cell("")
 
     def prepare_contexts(self):
         print("create contexts")
         self.contexts["value"]["no_label_float"] = True   # __: opov
 
-    def submit(self):
-        print("submit")
+    def modify_controls(self):
+        self.show("abort", False)
+        self.celement("output").classList.add("output")
+        self.element.classList.add("TestGrid")
+
+    def to_text(self):
+        self.value = "test"
+        console.log("submit")
+
+    def to_number(self):
+        self.value = 1.2
+        console.log("submit")
+
+    def to_form(self):
+        self.value = SubGrid()
+
+    def from_server(self):
+        def receive(item):
+            print("received item", item)
+            self.output += repr(item) + "\n"
+
+        def result(data):
+            print("data", data)
+            self.show("from_server")
+            self.show("abort", False)
+
+        def error(data):
+            print("error", data)
+            self.show("from_server")
+            self.show("abort", False)
+
+        self.show("from_server", False)
+        self.show("abort")
+        session = self.context["session"]  # __: opov
+        self.request = session.extern.get_data(10).receive(receive).then(result, error)
+
+    def abort(self):
+        self.request.abort()
+        self.show("from_server")
+        self.show("abort", False)
+
+    def calc_minsize(self):
+        size = calc_minsize()
+        self.output += f"min_size = {size}\n"
+
+    def show(self, name, visible=True):
+        self.contexts[name].element.style.display = "" if visible else "none"
 
     @rule
     def _rule_value_changed(self):
         print("changed value", self.value)
 
 
-def func(): pass
+class SubGrid(Grid):
+    layout = """
+[.submit]|[.cancel]
+"""
+
+    def submit(self):
+        pass
+
+    def cancel(self):
+        pass
 
 
-@register(type(func))
-class ButtonControl(Control):
-    def render(self, parent):
-        self.button = create_element("button")
-        self.button.innerText = self.context["name"] or "Press"   # __: opov
-        parent.appendChild(self.button)
-        self.button.addEventListener("click", self.on_click)
+def tabs_changed(event):
+    print("tabs changed", event)
 
-    def on_click(self, event):
-        print("click", event)
-        self.context.value()
+
+def adjust_size():
+    size = calc_minsize()
+    window.qt.set_size(*size)
+    window.qt.set_minsize(*size)
+    # window.qt.set_fixedsize(*size)
 
 
 def main():
-    grid = TestGrid()
-    grid.context["style"] = "polymer"  # __: opov
-    print("grid", grid.cells)
-    grid.render(document.querySelector("body"))
-    print("functype", type(grid.submit).__name__)
+    root_container = create_window_container(BODY)
 
-    c = ControlContext(10)
-    print("1. value", c.value)
-    c.value = 20
-    print("2. value", c.value)
-    print("parent", c.parent)
-    c["test"] = 10
-    print("test", c["test"])
-    window.grid = grid
+    frame = Frame()
+    print("--build frame")
+    frame.context["session"] = Session(root_container)  # __: opov
+    print("--set session")
+    window.session.set_root(frame)
+    window.grid = frame.content
+    BODY.addEventListener("tabindex-done", tabs_changed)
+    window.addEventListener("qtready", adjust_size)
 
 
 document.addEventListener('DOMContentLoaded', main)

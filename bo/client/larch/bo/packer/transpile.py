@@ -1,9 +1,9 @@
+import sys
 import re
 import subprocess
 import logging
 import json
 import shutil
-import sys
 from pathlib import Path
 
 logger = logging.getLogger("larch.bo.packer")
@@ -40,17 +40,11 @@ def additional_directories():
 
 def transpile_worker(linker):
     # transpile webworkers
-    if "larch.bo.client.server.xtransmitter" in sys.modules:
-        worker = "ajax"
-    elif "larch.bo.client.server.stransmitter" in sys.modules:
-        worker = "socket"
-    elif "larch.bo.client.server.atransmitter" in sys.modules:
-        worker = "api"
-    else:
-        return
-
+    worker = linker.config.get("transmitter")
     linker.worker = worker + ".js"
-    path = Path(sys.modules["larch.bo.client.server"].__file__).parent/(worker+".py")
+
+    import larch.bo.client.server as lbcs
+    path = Path(lbcs.__file__).parent/(worker+".py")
     worker_path = linker.path/"worker"
     # compile ajax worker
     print("transpile", worker)
@@ -67,6 +61,8 @@ def transpile_worker(linker):
     if result.returncode:
         raise RuntimeError("Error transpiling ajax")
 
+    return worker
+
 
 def transpile(linker):
     logger.info("transpile python %r\n%r", linker.path, linker.config)
@@ -74,8 +70,16 @@ def transpile(linker):
     cmd = f'python -m transcrypt --nomin --map --verbose -od {linker.path} {linker.config["root"]}'
     dirs = list(linker.config.get("extra_search_path", [])) + additional_directories()
     if dirs:
-        dirs = "$".join(d.replace(" ", "#") for d in dirs)
-        cmd += f" -xp {dirs}"
+        dirs = " ".join("-xp " + d.replace(" ", "#") for d in dirs)
+        cmd += f" {dirs}"
+
+    symbols = [linker.config.get("platform", sys.platform)]
+    transmitter = linker.config.get("transmitter")
+    if transmitter is not None:
+        symbols.append(transmitter)
+
+    symbols = ' '.join("-s " + s for s in symbols)
+    cmd += f" {symbols}"
 
     print(cmd)
     result = subprocess.run(

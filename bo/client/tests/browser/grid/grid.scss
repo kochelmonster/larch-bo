@@ -1,0 +1,18 @@
+
+.output {
+  --webkit-mask-image: var(--_lumo-text-field-overflow-mask-image);
+  mask-image: var(--_lumo-text-field-overflow-mask-image);
+  color: var(--lumo-body-text-color);
+  font-size: var(--lumo-font-size-m);
+  font-family: var(--lumo-font-family);
+  border-radius: var(--lumo-border-radius-m);
+  background-color: var(--lumo-contrast-10pct);
+  padding: 0 calc(0.375em + var(--lumo-border-radius-m) / 4 - 1px);
+  min-height: 5em;
+  max-height: 10em;
+  overflow: auto;
+}
+
+body {
+  background-color: blue;
+}

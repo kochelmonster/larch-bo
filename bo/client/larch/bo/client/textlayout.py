@@ -62,7 +62,7 @@ class DOMCell(Cell):
     def __bool__(self):
         return True
 
-    def set_style(self, style):
+    def set_css_style(self, style):
         style.gridColumnStart = str(self.columns[0]+1)
         style.gridColumnEnd = str(self.columns[1]+2)
         style.gridRowStart = str(self.rows[0]+1)
@@ -124,8 +124,8 @@ class AlignedCell(DOMCell):
         result = super().__repr__()
         return result[:-1] + "{" + self.alignment + "}>"
 
-    def set_style(self, style):
-        super().set_style(style)
+    def set_css_style(self, style):
+        super().set_css_style(style)
 
         if "l" in self.alignment:
             style.justifySelf = "start"

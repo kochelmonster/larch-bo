@@ -3,7 +3,7 @@ Javascript wrappers
 """
 from collections import deque
 from time import time
-from .control import EventHandler
+from .control import EventHandler, BODY
 # __pragma__("skip")
 from larch.bo.packer import parcel
 parcel.NEEDED_PACKAGES.append("vanilla-router")
@@ -15,9 +15,25 @@ def create_router(): pass
 # __pragma__("noskip")
 
 
+__pragma__('ecom')
+
+
+def set_transmitter(session):
+    __pragma__("ifdef", "ajax")
+    """?
+    from .server.transmitter import set_tmt
+    set_tmt(session)
+    ?"""
+    __pragma__("endif")
+    __pragma__("ifdef", "socket")
+    """?
+    from .server.transmitter import set_tmt
+    set_tmt(session)
+    ?"""
+    __pragma__("endif")
+
+
 Router = require("vanilla-router")
-
-
 __pragma__('js', '{}', '''
 function create_router() {
     return new Router({mode: "history"})
@@ -33,13 +49,15 @@ class SessionComunication:
 class Session(EventHandler):
     MAX_TASK_TIME = 0.05
 
-    def __init__(self, root_container="body"):
+    def __init__(self, root_container=None):
         self.tasks = deque()
         self.translations = {}
         self._active_dispatch_id = None
         self._wait_for_tabs = False
         self.router = create_router()
-        self.container = document.querySelector(root_container)
+        self.container = root_container or BODY
+        set_transmitter(self)
+        window.session = self
 
     def add_task(self, task, *args):
         self.tasks.append([task, args])

@@ -20,8 +20,6 @@ from contextlib import contextmanager
 logger = logging.getLogger('larch.ui')
 del logging
 
-PY2 = sys.version_info[0] == 2
-
 
 monkey.patch_all()
 
@@ -70,18 +68,14 @@ def restart_with_reloader():
         # a weird bug on windows. sometimes unicode strings end up in the
         # environment and subprocess.call does not like this, encode them
         # to latin1 and continue.
-        if os.name == 'nt' and PY2:
-            for key, value in new_environ.items():
-                if not isinstance(value, bytes):
-                    new_environ[key] = value.encode('iso-8859-1')
-
         try:
             process = subprocess.Popen(args, env=new_environ)
             process.wait()
         except KeyboardInterrupt:
             print("restart with reloader KeyboardInterrupt")
-            process.terminate()
             return 2
+        finally:
+            process.terminate()
 
         exit_code = process.returncode
         print("restart with reloader child process exit", exit_code)

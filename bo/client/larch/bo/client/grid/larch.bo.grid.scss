@@ -2,6 +2,15 @@
   display: grid;
   background: yellow;
   gap: 2pt 2pt;
+
+  label {
+    align-self: center;
+  }
+
+  color: var(--lumo-body-text-color);
+  font-size: var(--lumo-font-size-m);
+  font-family: var(--lumo-font-family);
+  border-radius: var(--lumo-border-radius-m);
 }
 
 html, body {

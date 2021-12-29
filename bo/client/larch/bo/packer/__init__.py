@@ -4,7 +4,7 @@ from . import parcel, gettext, transpile, html, linker
 
 def compile_resources(config, force):
     parcel.init(config)
-    with linker.Linker(config, force, True) as linker_:
+    with linker.Linker(config, force) as linker_:
         transpile.make(linker_)
         html.make(linker_)
         parcel.make(linker_)
@@ -15,7 +15,7 @@ def compile_resources(config, force):
 
 def start_watcher(config, wait_for_change):
     parcel.init(config)
-    linker_ = linker.Linker(config, False, False)
+    linker_ = linker.Linker(config, False)
     transpile.make(linker_)
     parcel.make_package_json(linker_)
     transpile.extend_manifest(linker_)

@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from importlib import import_module
 
-logger = logging.getLogger('larch.bo')
+logger = logging.getLogger('larch.bo.server')
 del logging
 
 DEFAULT_SERVER = "larch.bo.server.gevent"
@@ -15,17 +15,6 @@ DEFAULT_SERVER = "larch.bo.server.gevent"
 #   application is any wsgi application object. It can be a wsgi middleware
 #     component that wraps application (i.e wsgigzip):
 #       >>> run(application=GzipMiddleware(Application(config)))
-
-
-def local_parser():
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument('--left', type=int, help='left corner of window')
-    parser.add_argument('--top', type=int, help='top corner of window')
-    parser.add_argument('--width', type=int, help='width of window')
-    parser.add_argument('--height', type=int, help='height of window')
-    parser.add_argument('--remote-debugging-port', type=int, default=None)
-    parser.add_argument("--path", help="path of start url")
-    return parser
 
 
 def server_parser():
@@ -37,25 +26,12 @@ def server_parser():
 
 
 def all_parser():
-    choices = ['local', 'server', 'debug', 'compile', 'test']
-    parser = argparse.ArgumentParser(parents=[local_parser(), server_parser()])
-    parser.add_argument('--type', help='application type', choices=choices, default='local')
-    profiles = ['double-render']
-    parser.add_argument("--profile", help="profiling features", nargs="*", choices=profiles)
+    choices = ['server', 'debug', 'compile', 'test']
+    parser = argparse.ArgumentParser(parents=[server_parser()])
+    parser.add_argument('--type', help='application type', choices=choices, default='server')
     parser.add_argument("--recompile", action='store_true',
                         help="recompiles the resource file before execution")
     return parser
-
-
-def adjust_profiling(args):
-    try:
-        profile = args.profile or ()
-    except AttributeError:
-        profile = ()
-
-    if 'double-render' in profile:
-        from larch.frontent.debug import profile_find_double_rendering
-        profile_find_double_rendering()
 
 
 def check_for_compile(config):
@@ -78,10 +54,8 @@ def patch_gevent(config):
         config["gevent"] = True
 
 
-def run(root, application=None, config=None, **config_args):
+def run(root, config=None, application=None):
     config = config or {}
-    config.update(config_args)
-
     patch_gevent(config)
 
     arg_parser = config.get("arg_parser", None) or all_parser()
@@ -106,24 +80,17 @@ def run(root, application=None, config=None, **config_args):
         config["wsheartbeat"] = 0  # not needed
         return run_android(application, config)
 
-    adjust_profiling(args)
-
     try:
         type_ = args.type
     except AttributeError:
-        type_ = "local"  # a frozen version without this option
+        type_ = "server"
 
-    if type_ == 'local':  # pragma: no cover
-        from .extra.electron import run_electron
-        config["runtype"] = "local"
-        config["wsheartbeat"] = 0  # websocket heartbeat not needed
-        if config.get("debug", False):
-            check_for_compile(config)
-        return run_electron(application, config)
-    elif type_ == 'server':  # pragma: no cover
-        config["runtype"] = "server"
-        if config.get("debug", False):
-            check_for_compile(config)
+    logger.info("start as %r", type_)
+
+    if type_ == 'server':  # pragma: no cover
+        config.setdefault("runtype", "server")
+        #if config.get("debug", False):
+        #    check_for_compile(config)
         return run_server(application, config)
     elif type_ == 'compile':  # pragma: no cover
         from larch.bo.packer import compile_resources
@@ -131,7 +98,7 @@ def run(root, application=None, config=None, **config_args):
         compile_resources(config, True)
         return 0
     elif type_ == 'test':
-        config["runtype"] = "local"
+        config["runtype"] = "server"
         check_for_compile(config)
         return run_tests(application, config)
     else:  # pragma: no cover

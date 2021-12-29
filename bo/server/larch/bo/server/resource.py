@@ -5,7 +5,7 @@ from gettext import GNUTranslations
 from pathlib import Path
 from werkzeug.exceptions import NotFound
 
-logger = logging.getLogger('larch.ui.resource')
+logger = logging.getLogger('larch.bo.server')
 
 
 # resource handler

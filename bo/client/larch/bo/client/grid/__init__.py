@@ -26,6 +26,8 @@ class FieldContext(ControlContext):
         self.control = None
         self.old_control_key = None
         self.options["id"] = self.parent["id"] + "." + cell.name
+        if cell.style:
+            self.options["style"] = cell.style
 
     def control_key(self):
         t = type(self.value)
@@ -46,6 +48,9 @@ class FieldContext(ControlContext):
             self.control = create_control_factory(self)
             self.element.innerHTML = ""
             self.control.render(self.element)
+            session = self["session"]  # __: opov
+            if session is not None:
+                session.update_tabindex()
 
 
 class Label(AlignedCell):
@@ -65,7 +70,6 @@ class Label(AlignedCell):
         else:
             tmp.name = tmp.text
 
-        print("create label", tmp.name, tmp.columns, tmp.alignment)
         return tmp
 
     def create(self):
@@ -74,7 +78,7 @@ class Label(AlignedCell):
     def render(self, grid):
         grid.contexts[self.name]["element"] = el = document.createElement("label")
         el.innerHTML = self.text
-        self.set_style(el.style)
+        self.set_css_style(el.style)
         grid.element.appendChild(el)
 
 
@@ -117,7 +121,7 @@ class Field(AlignedCell):
 
     def render(self, grid):
         el = document.createElement("div")
-        self.set_style(el.style)
+        self.set_css_style(el.style)
         grid.element.appendChild(el)
         grid.contexts[self.name].element = el
 
@@ -143,7 +147,7 @@ class Spacer(DOMCell):
         el = document.createElement("div")
         el.style.width = self.width
         el.style.height = self.height
-        self.set_style(el.style)
+        self.set_css_style(el.style)
         grid.element.appendChild(el)
 
 
@@ -228,6 +232,7 @@ class Grid(Control):
             ctrl.unlink()
 
     def render_to_dom(self):
+        self._make_cells()
         element = self.element
         element.classList.add("lbo-grid")
         element.style["grid-template-columns"] = " ".join(
@@ -244,10 +249,6 @@ class Grid(Control):
             c.render(self)
 
         self.modify_controls()
-
-        session = self.context["session"]  # __: opov
-        if session is not None:
-            session.update_tabindex()
 
     def prepare_contexts(self):
         pass
@@ -269,7 +270,6 @@ class Grid(Control):
     def _rule_update_cells(self):
         self.layout
         yield
-        self._make_cells()
         if self.element:
             self.render_to_dom()
 

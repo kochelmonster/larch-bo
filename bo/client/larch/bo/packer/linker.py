@@ -4,11 +4,11 @@ from shutil import rmtree
 
 
 class Linker:
-    def __init__(self, config, force, remove):
+    def __init__(self, config, force):
         self.path = Path(config.get("build_path") or Path.cwd().resolve()/".lfrontend")
-        # remove = False
-        if remove:
+        if force:
             rmtree(self.path, ignore_errors=True)
+            assert(not self.path.exists())
 
         self.path.mkdir(parents=True, exist_ok=True)
         self.force = force

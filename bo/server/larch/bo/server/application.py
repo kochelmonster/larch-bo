@@ -7,7 +7,7 @@ import socket
 from gevent import spawn, getcurrent, Timeout, GreenletExit
 from werkzeug.wrappers import Request, Response
 from werkzeug.routing import Map, Rule
-from werkzeug.exceptions import HTTPException, BadRequest, NotFound
+from werkzeug.exceptions import HTTPException, BadRequest
 from msgpack import packb, Unpacker
 from larch.lib.aspect import pointcut
 from larch.lib.gevent import Queue
@@ -15,10 +15,11 @@ from larch.lib.gevent import Queue
 from .resource import ResourceManager
 
 
-logger = logging.getLogger('larch.ui')
+logger = logging.getLogger('larch.bo.server')
 logging.getLogger("geventwebsocket.handler").setLevel(logging.ERROR)
 
 GENTYPE = type((i for i in range(1)))
+
 
 # Public Classes
 # --------------
@@ -29,33 +30,6 @@ class ApplicationPointcut:
 
     def shutdown(self):
         """the application shutsdown."""
-
-    def session_from_cache(self, session):
-        """session was recreated from cache"""
-
-    def new_session(self, session):
-        """a new session was created"""
-
-    def remove_session(self, session):
-        """before a session is destroyed"""
-
-    def lost_socket(self, session):
-        """session lost socket."""
-
-    def got_socket(self, session):
-        """session got socket."""
-
-    def start_task_exec(self, session, func, args, kwargs):
-        """a session starts executing a task"""
-
-    def end_task_exec(self, session, func, args, kwargs):
-        """a session starts executing a task"""
-
-    def before_quit(self, session):
-        """is called by window before the application quits"""
-
-    def session_painted(self, session):
-        """is called after session.repaint was called"""
 
 
 class MsgPacker:
@@ -110,6 +84,9 @@ class Application(MsgPacker):
 
         self.url_map = Map(url_map)
         self.api = config.get("api", object())
+
+        for pc in config.get("application_pointcuts", []):
+            pc(self)
 
     # startup/shutdown code
     # ---------------------
@@ -179,6 +156,7 @@ class Application(MsgPacker):
                         chunk = ws.receive()
                     except Timeout:
                         ws.send_frame(b"helo", ws.OPCODE_PING)
+                        continue
 
                 obj = self.decode(chunk)
                 id_ = obj["id"]
@@ -269,12 +247,6 @@ class Application(MsgPacker):
         r.content_range = range_.make_content_range(size)
         r.accept_ranges = "bytes"
         return r
-
-    def lost_socket(self, session):
-        self.pointcut.lost_socket(session)
-
-    def got_socket(self, session):
-        self.pointcut.got_socket(session)
 
 
 def prepare_socket(socket_):

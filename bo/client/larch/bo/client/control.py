@@ -1,6 +1,6 @@
 """larch browser objects Rendering engine"""
 import larch.lib.adapter as adapter
-from larch.reactive import Pointer, rcontext, Container, Reactive, Cell
+from larch.reactive import Pointer, rcontext, Container, Reactive, Cell, rule
 
 
 # __pragma__("skip")
@@ -98,6 +98,38 @@ class NullControl(Control):
         self.element.style.backgroundColor = "red"
         self.element.innerText = "NULL"
         parent.appendChild(self.element)
+
+
+@register(str, "html")
+class HTMLControl(Control):
+    """
+    Control that displays HTML
+    """
+    TAG = "div"
+    element = Cell()
+
+    def render(self, parent):
+        self.element = document.createElement(self.TAG)
+        parent.appendChild(self.element)
+
+    def unlink(self):
+        self.element = None
+
+    @rule
+    def _rule_value_changed(self):
+        if self.element:
+            self.element.innerHTML = self.context.value
+
+
+@register(str, "text")
+class TextControl(HTMLControl):
+    """
+    Control that displays text
+    """
+    @rule
+    def _rule_value_changed(self):
+        if self.element:
+            self.element.innerText = self.context.value
 
 
 class ControlContext(Reactive):
