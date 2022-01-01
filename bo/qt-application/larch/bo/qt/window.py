@@ -1,27 +1,15 @@
 """Standalone Browser for larch browser object"""
-import sys
 import logging
-from pathlib import Path
-from PySide6.QtCore import QUrl, Qt, QEvent, QFile, QObject, Slot, QJsonValue, QPoint
+from PySide6.QtCore import QUrl, Qt, QEvent, QFile, QObject, Slot, QPoint
 from PySide6.QtGui import QColor, QAction
-from PySide6.QtWidgets import QApplication, QMainWindow, QMenu
-from PySide6.QtWebEngineCore import (
-    QWebEnginePage, QWebEngineUrlRequestInterceptor, QWebEngineProfile)
+from PySide6.QtWidgets import QMainWindow, QMenu, QApplication
+from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebChannel import QWebChannel
 
 
 logger = logging.getLogger('larch.bo.qt')
 
-"""
-TODO:
- - Start python
-   - client imports for python skippen
-   - transmitter mit config einstellen
-
- - laden von resourcen durch redirect
- - kein transmitter kein start server in application
-"""
 
 INIT_BRIDGE = """
 (function() {
@@ -47,7 +35,8 @@ INIT_BRIDGE = """
 
     var body = document.querySelector("body");
     body.addEventListener("mousedown", on_mousedown);
-})()
+})();
+document.querySelector("body").classList.add("qt-app");
 """
 
 MAXIMIZED = """
@@ -102,6 +91,10 @@ class JSBridge(QObject):
         self.window.size_is_fixed = True
         self.window.view.page().runJavaScript(FIXED_SIZE)
 
+    @Slot(str)
+    def set_background(self, color):
+        self.window.set_background(color)
+
     @Slot()
     def close(self):
         self.window.close()
@@ -118,14 +111,13 @@ class JSBridge(QObject):
     def fullscreen(self):
         self.window.showFullScreen()
 
-    @Slot(str, QJsonValue, result=str)
-    def call(self, func_name, param):
-        print("call", func_name, param, param.toObject())
-        return "eins"
+    @Slot()
+    def start_debugger(self):
+        self.window.view.show_inspector()
 
-    @Slot(str)
-    def receiveText(self, text):
-        print("receiveText", text)
+    @Slot()
+    def reload(self):
+        self.window.reload()
 
 
 class WindowDragging:
@@ -276,91 +268,97 @@ class WebView(WindowDragging, QWebEngineView):
 
     # Create a new webview window pointing at the Remote debugger server
     def show_inspector(self):
-        wid = self.parent().wid + '-inspector'
         try:
-            # If inspector already exists, bring it to the front
-            BrowserWindow.instances[wid].raise_()
-            BrowserWindow.instances[wid].activateWindow()
-        except KeyError:
+            self.inspector
+        except AttributeError:
+            def remove(): del self.inspector
             from .debug import Inspector
-            inspector = Inspector(wid, self.page(), BrowserWindow.instances)
-            inspector.show()
-
-
-class NavigationHandler(QWebEnginePage):
-    def acceptNavigationRequest(self, url, type, is_main_frame):
-        # webbrowser.open(url.toString(), 2, True)
-        print("acceptNavigationRequest", url)
-        return False
+            self.inspector = Inspector(self.page())
+            self.inspector.show()
+            self.inspector.closed.connect(remove)
 
 
 class WebPage(QWebEnginePage):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, profile, parent):
+        super().__init__(profile, parent)
         self.featurePermissionRequested.connect(self.on_feature_permission_requested)
-        self.iconChanged.connect(self.on_icon_changed)
-        self.nav_handler = NavigationHandler(self)
+        self.newWindowRequested.connect(self.on_new_window)
+
+        settings = self.settings()
+        settings.setAttribute(settings.JavascriptCanOpenWindows, True)
+        settings.setAttribute(settings.AllowWindowActivationFromJavaScript, True)
 
     def on_feature_permission_requested(self, url, feature):
+        print("**feature permission requested")
         self.setFeaturePermission(url, feature, QWebEnginePage.PermissionGrantedByUser)
 
-    def on_icon_changed(self, icon):
-        print("icon changed", icon, self.parent())
+    def on_new_window(self, request):
+        src_window = self.parent().parent()
+        window = BrowserWindow(None, src_window.config)
+        sgeo = request.requestedGeometry()
+        dgeo = window.frameGeometry()
+        if v := sgeo.left():
+            dgeo.setLeft(v)
+        if v := sgeo.right():
+            dgeo.setRight(v)
+        if v := sgeo.width():
+            dgeo.setWidth(v)
+        if v := sgeo.height():
+            dgeo.setHeight(v)
+        window.setGeometry(dgeo)
 
-    def createWindow(self, type):
-        return self.nav_handler
+        if request.destination() == request.DestinationType.InNewDialog:
+            window.setWindowModality(Qt.ApplicationModal)
+
+        request.openIn(window.view.page())
 
 
 class BrowserWindow(QMainWindow):
-    instances = {}
+    instances = set()
     size_is_fixed = False
 
-    def __init__(self, wid, url, config):
+    def __init__(self, url, config):
         super().__init__()
-        self.wid = wid
-        self.instances[wid] = self
+        self.config = config
+        self.instances.add(self)
+
+        profile = QWebEngineProfile.defaultProfile()
+        profile.setHttpUserAgent("QT LarchBo Browser")
 
         self.setWindowTitle('Larch Bo Browser')
         self.view = WebView()
-        self.view.setPage(WebPage())
+        page = WebPage(profile, self.view)
+        self.view.setPage(page)
 
         self.init_by_config(config)
-        self.view.page().loadFinished.connect(self.on_load_finished)
+        page.loadFinished.connect(self.on_load_finished)
 
         self.setCentralWidget(self.view)
 
-        self.channel = QWebChannel(self.view.page())
-        self.view.page().setWebChannel(self.channel)
+        self.channel = QWebChannel(page)
+        page.setWebChannel(self.channel)
+        self.js_bridge = JSBridge(self)
+        self.channel.registerObject('qt', self.js_bridge)
 
-        self.view.load(QUrl(url))
-        self.view.page().titleChanged.connect(self.setWindowTitle)
+        page.titleChanged.connect(self.setWindowTitle)
+        page.iconChanged.connect(self.setWindowIcon)
+
+        if url:
+            self.view.load(QUrl(url))
 
     def init_by_config(self, config):
         args = config["args"]
         wconfig = config.get("window", {})
 
         flags = self.windowFlags()
-        if wconfig.get("frameless", True):
+        if wconfig.get("frameless", True) and "window" in config:
             flags = flags | Qt.FramelessWindowHint
 
         if wconfig.get("ontop"):
             flags = flags | Qt.WindowStaysOnTopHint
 
         self.setWindowFlags(flags)
-
-        if wconfig.get("transparent"):
-            self.background_color = QColor('transparent')
-            palette = self.palette()
-            palette.setColor(self.backgroundRole(), self.background_color)
-            self.setPalette(palette)
-            # Enable the transparency hint
-            self.setAttribute(Qt.WA_TranslucentBackground)
-
-            self.view.setAttribute(Qt.WA_TranslucentBackground)
-            self.view.setAttribute(Qt.WA_OpaquePaintEvent, False)
-            self.view.setStyleSheet("background: transparent;")
-
-            self.view.page().setBackgroundColor(Qt.transparent)
+        self.set_background(wconfig.get("background", "white"))
 
         availableGeometry = self.screen().availableGeometry()
         if args.width:
@@ -394,17 +392,16 @@ class BrowserWindow(QMainWindow):
         if not config.get("debug"):
             self.view.setContextMenuPolicy(Qt.NoContextMenu)
 
-    def closeEvent(self, event):
-        self.instances.pop(self.wid, None)
-        event.accept()
-        if not self.instances:
-            QApplication.instance().exit()
+    def reload(self):
+        self.view.page().triggerAction(QWebEnginePage.WebAction.ReloadAndBypassCache)
 
     def on_load_finished(self):
-        if self.wid.endswith("-inspector"):
-            return
-
         self._set_js_api()
+        wconfig = self.config.get("window", {})
+        if wconfig.get("visible", True):
+            self.show()
+        if wconfig.get("debugger", False):
+            self.view.show_inspector()
 
     def _set_js_api(self):
         qwebchannel_js = QFile('://qtwebchannel/qwebchannel.js')
@@ -412,8 +409,6 @@ class BrowserWindow(QMainWindow):
             source = bytes(qwebchannel_js.readAll()).decode('utf-8')
             qwebchannel_js.close()
             self.view.page().runJavaScript(source)
-            self.js_bridge = JSBridge(self)
-            self.channel.registerObject('qt', self.js_bridge)
             self.view.page().runJavaScript(INIT_BRIDGE)
             if self.size_is_fixed:
                 self.view.page().runJavaScript(FIXED_SIZE)
@@ -431,34 +426,33 @@ class BrowserWindow(QMainWindow):
 
         return False
 
+    def closeEvent(self, event):
+        super().closeEvent(event)
+        self.instances.remove(self)
 
-class LocalRedirector(QWebEngineUrlRequestInterceptor):
-    def __init__(self, resource_path):
-        super().__init__()
-        self.resource_path = Path(resource_path)
-
-    def interceptRequest(self, info):
-        url = info.requestUrl().toString()
-        if url.startswith("http://localhost:"):
-            path = url[17:].split("/", 1)[-1]
-            if path and not path.startswith("api"):
-                new_url = QUrl.fromLocalFile(str(self.resource_path/path))
-                print("load", new_url, (self.resource_path/path).exists())
-                try:
-                    info.redirect(new_url)
-                except Exception as e:
-                    print("error", e)
+    def set_background(self, background):
+        self.background_color = QColor(background)
+        palette = self.palette()
+        palette.setColor(self.backgroundRole(), self.background_color)
+        self.setPalette(palette)
+        self.view.setStyleSheet(f"background: {background};")
+        if background == "transparent":
+            # Enable the transparency hint
+            self.setAttribute(Qt.WA_TranslucentBackground)
+            self.view.setAttribute(Qt.WA_TranslucentBackground)
+            self.view.setAttribute(Qt.WA_OpaquePaintEvent, False)
+            self.view.page().setBackgroundColor(Qt.transparent)
+        else:
+            self.view.page().setBackgroundColor(self.background_color)
 
 
-def start_frontend(url, config):
-    argv = sys.argv[:]
-    if "--disable-web-security" not in sys.argv:
-        argv.append("--disable-web-security")
-
-    app = QApplication(argv)
+def start_frontend(url, config, filewatch=False):
+    app = QApplication([])
     logger.info("start main window with url %r", url)
-    # redirector = LocalRedirector(config["resources_path"])
-    # QWebEngineProfile.defaultProfile().setUrlRequestInterceptor(redirector)
-    mainWin = BrowserWindow("main", url, config)
-    mainWin.show()
+    BrowserWindow(url, config)
+
+    if filewatch:
+        from .debug import install_watcher
+        install_watcher(config, BrowserWindow.instances)
+
     return app.exec()

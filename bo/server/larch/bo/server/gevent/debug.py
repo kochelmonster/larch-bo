@@ -12,12 +12,12 @@ import time
 import site
 from itertools import chain
 from gevent.event import AsyncResult
-from gevent import subprocess, monkey, getcurrent, kill
+from gevent import subprocess, monkey, getcurrent, kill, signal, killall, spawn
 from watchdog_gevent import Observer
 from watchdog.events import FileSystemEventHandler
 from contextlib import contextmanager
 
-logger = logging.getLogger('larch.ui')
+logger = logging.getLogger('larch.bo.server.debug')
 del logging
 
 
@@ -30,6 +30,13 @@ class CheckFiles(FileSystemEventHandler):
 
     def on_modified(self, event):
         self.changed_file.set(event.src_path)
+
+
+system_greenlets = []
+
+
+def kill_greenlets(*args):
+    killall(system_greenlets)
 
 
 def run_with_reloader(main_func, extra_files=None, interval=1):
@@ -52,7 +59,10 @@ def run_with_reloader(main_func, extra_files=None, interval=1):
             main_greenlet.kill()
         return result
 
-    return restart_with_reloader()
+    g = spawn(restart_with_reloader)
+    system_greenlets.append(g)
+    signal.signal(signal.SIGTERM, kill_greenlets)
+    return g.get(block=True)
 
 
 def restart_with_reloader():
@@ -64,10 +74,6 @@ def restart_with_reloader():
         args = [sys.executable] + sys.argv
         new_environ = os.environ.copy()
         new_environ['WERKZEUG_RUN_MAIN'] = 'true'
-
-        # a weird bug on windows. sometimes unicode strings end up in the
-        # environment and subprocess.call does not like this, encode them
-        # to latin1 and continue.
         try:
             process = subprocess.Popen(args, env=new_environ)
             process.wait()

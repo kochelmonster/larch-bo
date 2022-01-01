@@ -4,7 +4,7 @@ from larch.bo.client.control import Control, register
 # __pragma__("skip")
 from larch.bo.packer import parcel
 document = None
-parcel.NEEDED_PACKAGES.append("@polymer/paper-input")
+parcel.NEEDED_PACKAGES.add("@polymer/paper-input")
 def require(p): pass
 # __pragma__("noskip")
 

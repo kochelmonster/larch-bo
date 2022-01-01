@@ -1,10 +1,10 @@
 import sys
 import re
-import subprocess
 import logging
 import json
 import shutil
 from pathlib import Path
+from gevent import spawn, subprocess
 
 logger = logging.getLogger("larch.bo.packer")
 
@@ -38,17 +38,20 @@ def additional_directories():
     return dirs
 
 
-def transpile_worker(linker):
-    # transpile webworkers
-    worker = linker.config.get("transmitter")
-    linker.worker = worker + ".js"
+def transpile_transmitter(linker):
+    # transpile transmitter as webworker
+    transmitter = linker.config.get("transmitter")
+    if not transmitter:
+        return
+
+    linker.transmitter = transmitter + ".js"
 
     import larch.bo.client.server as lbcs
-    path = Path(lbcs.__file__).parent/(worker+".py")
-    worker_path = linker.path/"worker"
-    # compile ajax worker
-    print("transpile", worker)
-    cmd = f'python -m transcrypt --nomin --map --verbose -od {worker_path} {path}'
+    path = Path(lbcs.__file__).parent/(transmitter+".py")
+    transmitter_path = linker.path/"transmitter"
+
+    print("transpile", transmitter)
+    cmd = f'python -m transcrypt --nomin --map --verbose -od {transmitter_path} {path}'
     print(cmd)
     result = subprocess.run(
         cmd, shell=True, stderr=subprocess.STDOUT,
@@ -61,13 +64,14 @@ def transpile_worker(linker):
     if result.returncode:
         raise RuntimeError("Error transpiling ajax")
 
-    return worker
+    return transmitter
 
 
 def transpile(linker):
     logger.info("transpile python %r\n%r", linker.path, linker.config)
 
-    cmd = f'python -m transcrypt --nomin --map --verbose -od {linker.path} {linker.config["root"]}'
+    dstpath = linker.path / "main"
+    cmd = f'python -m transcrypt --nomin --map --verbose -od {dstpath} {linker.config["root"]}'
     dirs = list(linker.config.get("extra_search_path", [])) + additional_directories()
     if dirs:
         dirs = " ".join("-xp " + d.replace(" ", "#") for d in dirs)
@@ -92,15 +96,16 @@ def transpile(linker):
     if result.returncode:
         raise RuntimeError("Error transpiling")
 
-    transpile_worker(linker)
+    transpile_transmitter(linker)
 
 
 def make(linker):
     if not needs_transpile(linker):
-        return
+        return True
 
     transpile(linker)
     copy_resources(linker)
+    return False
 
 
 def extend_manifest(linker):
@@ -114,13 +119,15 @@ def extend_manifest(linker):
     for source in linker.context["python_sources"]:
         python_sources[source] = Path(source).stat().st_mtime
 
-    with open(linker.path/"dist/manifest.json", "w") as f:
+    dest_path = linker.path/"dist"
+    dest_path.mkdir(exist_ok=True, parents=True)
+    with open(dest_path/"manifest.json", "w") as f:
         json.dump(manifest, f, indent=2)
 
 
 def get_project_file(linker):
     name = Path(linker.config["root"]).stem + ".project"
-    return linker.path/name
+    return linker.path/"main"/name
 
 
 def read_project_file(linker):
@@ -145,15 +152,21 @@ def copy_resources(linker):
                 # a global package
                 continue
 
-            dest_path = linker.path/require
+            dest_path = linker.path/"main"/require
             resources.add(str(require_path))
             if not dest_path.exists() or require_path.stat().st_mtime > dest_path.stat().st_mtime:
                 shutil.copy(require_path, dest_path)
 
 
 def watch(linker, wait_for_change):
+    print("**start watch transpile")
     while True:
         copy_resources(linker)
         sources = linker.context["python_sources"] | linker.context["resources"]
         wait_for_change(sources)
+        print("**sources changed")
         transpile(linker)
+
+
+def start_watcher(linker, wait_for_change):
+    return spawn(watch, linker, wait_for_change)

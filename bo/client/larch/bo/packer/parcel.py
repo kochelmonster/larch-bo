@@ -1,21 +1,42 @@
 """interface to webpack manager"""
 import re
+import os
 import sys
 import json
-import subprocess
 import logging
 import signal
+from pickle import loads, dumps
 from pathlib import Path
+from larch.lib.utils import deep_update
+from gevent import spawn, subprocess
 from .npm import make as npm_make
 
 logger = logging.getLogger("larch.bo.packer")
 
 DIR = Path(__file__).resolve().parent
 
-NEEDED_PACKAGES = ["parcel"]
+NEEDED_PACKAGES = {"parcel"}
 
 
 require_replace = re.compile("require.*\"(.*?)\"")
+
+
+QT_BROWSER = {
+    # "browserslist": "Chrome 80"
+    "browserslist": "> 0.5%, last 2 versions, not dead",
+}
+
+INTERNET = {
+    "browserslist": "> 0.5%, last 2 versions, not dead"
+}
+
+
+PACKAGE_TEMPLATE = {
+    "devDependencies": {
+        "parcel": "latest"
+    },
+    "source": ""
+}
 
 
 def init(config):
@@ -25,17 +46,19 @@ def init(config):
         npm_make(p, start)
 
 
-def make_package_json(linker):
-    template = "package.json"
-    template = linker.config.get("parcel_config", DIR/template)
-    if Path(template).exists():
-        with open(template, "r") as f:
-            template = f.read()
+def make_package_json(linker, directory, entry):
+    package = loads(dumps(PACKAGE_TEMPLATE))  # deep copy
 
-    package = json.loads(template)
-    package["name"] = linker.config.get("name", Path(linker.config["root"]).name)
+    if linker.config.get("window"):
+        # standalone
+        package = deep_update(package, QT_BROWSER)
+    else:
+        package = deep_update(package, INTERNET)
 
-    with open(linker.path/"package.json", "w") as f:
+    package["source"] = entry
+    package = deep_update(package, linker.config.get("parcel_config", {}))
+
+    with open(linker.path/directory/"package.json", "w") as f:
         f.write(json.dumps(package, indent=2))
 
 
@@ -46,64 +69,75 @@ def patch_msgpack(script):
     script.write_text(script.read_text().replace(".global", ".$parcel$global"))
 
 
-def make_worker(linker):
-    if linker.worker is None:
-        return
+def create_entries(linker):
+    entry_paths = []
 
-    name = linker.path/"worker"/linker.worker
-    cmd = f'npx parcel build {name} --dist-dir {linker.config["resources_path"]}'
-    if linker.config.get("debug"):
-        cmd += " --no-optimize"
+    entry_paths.append(linker.path/"main")
+    if linker.transmitter:
+        entry_paths.append(linker.path/"transmitter")
 
-    result = subprocess.run(
-        cmd, shell=True, cwd=linker.path, stderr=subprocess.STDOUT,
-        stdout=subprocess.PIPE, encoding="utf8")
-
-    print(cmd)
-    for line in result.stdout:
-        sys.stdout.write(line)
-        sys.stdout.flush()
-
-    if result.returncode:
-        raise RuntimeError("Error packing worker")
-
-    patch_msgpack(linker.config["resources_path"]/name.name)
+    return entry_paths
 
 
 def make(linker):
     logger.info("make parcel %r\n%r", linker.path, linker.config)
 
-    make_worker(linker)
-    make_package_json(linker)
+    main_name = Path(linker.config["root"]).with_suffix(".js")
+    make_package_json(linker, "main", main_name.name)
+    if linker.transmitter:
+        make_package_json(linker, "transmitter", linker.transmitter)
 
-    name = linker.path/"index.html"
-    cmd = (f'npx parcel build {name} --dist-dir {linker.config["resources_path"]} '
-           '--log-level=verbose')
-    cmd = f'npx parcel build {name} --dist-dir {linker.config["resources_path"]}'
-    if linker.config.get("debug"):
-        cmd += " --no-optimize"
+    environ = os.environ.copy()
+    environ["FORCE_COLOR"] = "3"
 
-    result = subprocess.run(
-        cmd, shell=True, cwd=linker.path, stderr=subprocess.STDOUT,
-        stdout=subprocess.PIPE, encoding="utf8")
+    for entry in create_entries(linker):
+        cmd = f'npx parcel build {entry} --dist-dir {linker.config["resource_path"]}'
+        cmd += " --no-content-hash"
+        if linker.config.get("debug"):
+            cmd += " --no-optimize"
 
-    print(cmd)
-    for line in result.stdout:
-        sys.stdout.write(line)
-        sys.stdout.flush()
-    if result.returncode:
-        raise RuntimeError("Error completing bundler")
+        result = subprocess.run(
+            cmd, shell=True, cwd=linker.path, stderr=subprocess.STDOUT, env=environ,
+            stdout=subprocess.PIPE, encoding="utf8")
+
+        print(cmd)
+        for line in result.stdout:
+            sys.stdout.write(line)
+            sys.stdout.flush()
+        if result.returncode:
+            raise RuntimeError("Error completing bundler")
+
+    if linker.transmitter:
+        patch_msgpack(linker.config["resource_path"]/linker.transmitter)
 
 
 def watch(linker):
+    environ = os.environ.copy()
+    environ["FORCE_COLOR"] = "3"
     build_path = linker.config["build_path"]
-    name = linker.path/"index.html"
-    cmd = (f'npx parcel watch {name} --dist-dir {linker.config["resources_path"]} '
-           '--no-hmr --log-level=verbose')
+    entry = create_entries(linker)[0]
+    cmd = (f'npx parcel watch {entry} --dist-dir {linker.config["resource_path"]} '
+           '--no-hmr --log-level=verbose --watch-for-stdin')
     try:
-        process = subprocess.Popen(cmd, shell=True, cwd=build_path)
+        print("**start parcel watch")
+        process = subprocess.Popen(
+            cmd, shell=True, cwd=build_path, env=environ, stdin=subprocess.PIPE)
         process.wait()
         print("done parcel", process.returncode)
         signal.raise_signal(signal.SIGINT)
     finally:
+        process.stdin.close()
         process.kill()
+
+
+def start_watcher(linker):
+    main_name = Path(linker.config["root"]).with_suffix(".js")
+    make_package_json(linker, "main", main_name.name)
+    if linker.transmitter:
+        make_package_json(linker, "transmitter", linker.transmitter)
+
+    respath = linker.config["resource_path"]
+    if linker.transmitter and not (respath/linker.transmitter).exists():
+        make(linker)
+
+    return spawn(watch, linker)

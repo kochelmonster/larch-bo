@@ -1,12 +1,7 @@
 import re
 from larch.reactive import rule, Pointer, Cell
 from ..textlayout import DOMCell, Empty, AlignedCell, Parser, Stretcher, RowSpan, walk_pointer
-from ..control import Control, ControlContext, create_control_factory
-
-# TODO: splitter handling (min(min-content, px)) https://stackoverflow.com/questions/46931103/making-a-dragbar-to-resize-divs-inside-css-grids#46934825
-# TODO: Save state
-# TODO: i18n
-# TODO: CSS animation
+from ..control import Control, RenderingContext
 
 # __pragma__("skip")
 document = None
@@ -17,40 +12,15 @@ def require(n): pass
 require("./larch.bo.grid.scss")
 
 
-class FieldContext(ControlContext):
+class FieldContext(RenderingContext):
     element = Cell()
 
     def __init__(self, value, parent, cell):
         super().__init__(value, parent)
         self.options["name"] = cell.name
-        self.control = None
-        self.old_control_key = None
         self.options["id"] = self.parent["id"] + "." + cell.name
         if cell.style:
             self.options["style"] = cell.style
-
-    def control_key(self):
-        t = type(self.value)
-        style = self['style']  # __: opov
-        return f"{t.__name__}:{t.__module__}-{style}" if t else None
-
-    @rule(-1)
-    def _rule_render_control(self):
-        if self.element is None:
-            return
-
-        key = self.control_key()
-        if key != self.old_control_key:
-            if self.control is not None:
-                self.control.unlink()
-            yield
-            self.old_control_key = key
-            self.control = create_control_factory(self)
-            self.element.innerHTML = ""
-            self.control.render(self.element)
-            session = self["session"]  # __: opov
-            if session is not None:
-                session.update_tabindex()
 
 
 class Label(AlignedCell):
@@ -168,10 +138,11 @@ class Grid(Control):
     layout_cache = {}
     element = None
 
-    def __init__(self, context_or_value=None):
-        super().__init__(context_or_value)
-        if not self.context["id"]:
-            self.context["id"] = self.__class__.__name__
+    @property
+    def parent(self):
+        """returns the parent control"""
+        if self.context and self.context.parent:
+            return self.context.parent.control
 
     def _make_cells(self):
         parsed = self.__class__.layout_cache.get(self.layout)
@@ -214,6 +185,9 @@ class Grid(Control):
         return self.cells
 
     def render(self, parent):
+        if not self.context["id"]:
+            self.context["id"] = self.__class__.__name__
+        self.context.control = self
         self.element = document.createElement("div")
         parent.appendChild(self.element)
         self.render_to_dom()
@@ -259,6 +233,10 @@ class Grid(Control):
     def celement(self, name):
         """short for self.contexts[name].control.element"""
         return self.contexts[name].control.element
+
+    def control(self, name):
+        """short for self.contexts[name].control"""
+        return self.contexts[name].control
 
     def get_tab_elements(self):
         elements = []

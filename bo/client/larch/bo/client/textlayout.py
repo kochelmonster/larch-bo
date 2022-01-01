@@ -343,17 +343,6 @@ def walk_pointer(pointer, path):
     return pointer
 
 
-'''
-class LineList(list):
-    def join(self):
-        def padd(string, size):
-            if len(string) < size:
-                return string + " "*(size-len(string))
-            return string
-
-        return "|".join(padd(c, s) for c, s in zip(self, self.builder.sizes))
-
-
 class LayoutBuilder:
     def __init__(self):
         self.sizes = []
@@ -372,9 +361,9 @@ class LayoutBuilder:
                         yield c.strip()
 
         if not cols:
-            result = LineList([""] * len(self.sizes))
+            result = patch_join(self, ([""] * len(self.sizes)))
         else:
-            result = LineList(iter_cols())
+            result = patch_join(self, iter_cols())
 
         if len(result) > len(self.sizes):
             self.sizes.extend([0]*(len(result)-len(self.sizes)))
@@ -384,4 +373,26 @@ class LayoutBuilder:
 
         result.builder = self
         return result
-'''
+
+
+LineList = list
+
+
+# __pragma__("skip")
+class LineList(list):
+    pass
+# __pragma__("noskip")
+
+
+def patch_join(builder, sequence):
+    def join():
+        def padd(string, size):
+            if len(string) < size:
+                return string + " "*(size-len(string))
+            return string
+
+        return "|".join(padd(c, s) for c, s in zip(result, builder.sizes))
+
+    result = LineList(sequence)
+    result.join = join
+    return result

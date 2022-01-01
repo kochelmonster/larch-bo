@@ -18,7 +18,7 @@ class ResourceManager:
 
     def __init__(self, config):
         self.config = config
-        self.path = Path(config["resources_path"])
+        self.path = Path(config["resource_path"])
 
     def shutdown(self):
         pass

@@ -154,6 +154,8 @@ class Application(MsgPacker):
                 with Timeout(timeout):
                     try:
                         chunk = ws.receive()
+                        if chunk is None:
+                            break
                     except Timeout:
                         ws.send_frame(b"helo", ws.OPCODE_PING)
                         continue
@@ -175,8 +177,6 @@ class Application(MsgPacker):
                         request["args"][0].put(obj["data"])
                     else:
                         request["greenlet"].kill()
-
-            ws.close()
         except Exception as e:
             ws.close(1006)
             logger.exception("error handling websocket %r", e)

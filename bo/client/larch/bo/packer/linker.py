@@ -14,7 +14,7 @@ class Linker:
         self.force = force
         self.config = config
         self.context = {}
-        self.worker = None
+        self.transmitter = None
 
     def __enter__(self):
         return self

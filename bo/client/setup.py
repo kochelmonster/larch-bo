@@ -4,7 +4,7 @@ larch browser objects productive package.
 from setuptools import setup, find_packages
 
 
-dependencies = []
+dependencies = ["gevent", "larch.lib"]
 
 
 setup(

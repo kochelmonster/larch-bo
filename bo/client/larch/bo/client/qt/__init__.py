@@ -3,8 +3,7 @@ Simulation of plattform window, in standard alone browser.
 """
 # __pragma__("skip")
 from larch.bo.packer import parcel
-parcel.NEEDED_PACKAGES.extend([
-    "electron-titlebar-windows", "titlebar"])
+parcel.NEEDED_PACKAGES.update(["electron-titlebar-windows", "titlebar"])
 document = None
 window = None
 def require(p): pass

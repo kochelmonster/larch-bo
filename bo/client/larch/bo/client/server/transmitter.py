@@ -1,23 +1,10 @@
 import time
+from ..browser import create_promise, as_array
 
 # __pragma__("skip")
-Object = window = None
+location = Object = window = None
 def __pragma__(*args): pass
-def create_promise(): pass
-def as_array(): pass
-def create_worker(): pass
 # __pragma__("noskip")
-
-
-__pragma__('js', '{}', '''
-function create_promise(call_back) {
-    return new Promise(call_back);
-}
-
-function as_array(pyobj) {
-    return Array.from(pyobj);
-}
-''')
 
 
 def as_js_object(dict_):
@@ -129,18 +116,22 @@ class Transmitter:
                 request._receive(obj["item"])
 
 
-__pragma__("ecom")
-__pragma__("ifdef", "ajax")
-"""?
-from .xtransmitter import create_worker
-?"""
-__pragma__("else")
-"""?
-from .stransmitter import create_worker
-?"""
-__pragma__("endif")
+def create_worker(url):
+    __pragma__('js', '{}', '''
+    if (location.protocol == "file:") {
+        var tmp = new URL(location.href);
+        url += "?transmitter=" + tmp.searchParams.get("transmitter");
+    }
+    return new Worker(url, {type: "classic"});
+    ''')
 
 
 def set_tmt(session):
-    window.transmitter = Transmitter(create_worker())
+    __pragma__("ifdef", "ajax")
+    worker = create_worker("./ajax.js")
+    __pragma__("else")
+    worker = create_worker("./socket.js")
+    __pragma__("endif")
+
+    window.transmitter = Transmitter(worker)
     session.extern = window.transmitter.api

@@ -31,12 +31,15 @@ def all_parser():
     parser.add_argument('--type', help='application type', choices=choices, default='server')
     parser.add_argument("--recompile", action='store_true',
                         help="recompiles the resource file before execution")
+    parser.add_argument("--no-module", action='store_true',
+                        help="Do no load javscript as module. This option allows index.html to "
+                        "load as file. Works only with --type=compile")
     return parser
 
 
 def check_for_compile(config):
     from larch.bo.packer import compile_resources
-    force = config["runtype"] == "compile"
+    force = config.get("runtype") == "compile"
     if not force:
         try:
             force = config["args"].recompile
@@ -72,7 +75,7 @@ def run(root, config=None, application=None):
         root = module.__file__
 
     config["root"] = root
-    config.setdefault("resources_path", Path(
+    config.setdefault("resource_path", Path(
         config.get("build_path") or Path.cwd().resolve()/".lfrontend")/"dist")
 
     if os.environ.get("ANDROID_APP_PATH"):
@@ -86,11 +89,10 @@ def run(root, config=None, application=None):
         type_ = "server"
 
     logger.info("start as %r", type_)
-
     if type_ == 'server':  # pragma: no cover
         config.setdefault("runtype", "server")
-        #if config.get("debug", False):
-        #    check_for_compile(config)
+        if config.get("debug", False):
+            check_for_compile(config)
         return run_server(application, config)
     elif type_ == 'compile':  # pragma: no cover
         from larch.bo.packer import compile_resources
@@ -105,19 +107,15 @@ def run(root, config=None, application=None):
         def run_debug():
             run_server(application, config)
 
-        if config.get("gevent"):
-            from .gevent.debug import run_with_reloader, wait_for_change
-        else:
-            from werkzeug._reloader import run_with_reloader
-
-        config.setdefault("build_path", Path(config["resources_path"]).parent)
+        from .gevent.debug import run_with_reloader, wait_for_change, system_greenlets
+        config.setdefault("build_path", Path(config["resource_path"]).parent)
         config["runtype"] = "debug"
         config['debug'] = True
 
         if not os.environ.get('WERKZEUG_RUN_MAIN'):
             from larch.bo.packer import start_watcher
             # check_for_compile(config)
-            start_watcher(config, wait_for_change)
+            system_greenlets.extend(start_watcher(config, wait_for_change))
 
         return run_with_reloader(run_debug)
 

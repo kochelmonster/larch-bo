@@ -3,7 +3,7 @@ from larch.bo.client.vaadin.vinput import register as input_register
 from larch.bo.client.vaadin.vbutton import register as button_register
 from larch.bo.client.grid import Grid
 from larch.bo.client.session import Session
-from larch.bo.client.control import BODY
+from larch.bo.client.browser import BODY, start_main
 from larch.bo.client.qt import create_window_container, calc_minsize
 from larch.reactive import Cell, rule
 
@@ -40,6 +40,7 @@ if __name__ == "__main__":
         "transmitter": "socket",
         "window": {
             "frameless": False,
+            "debugger": False,
             "width": 0,
             "height": 0,
         }
@@ -79,11 +80,10 @@ lvalue:Value{r}|[.value]{l}
     <1>        |<1>
 """
 
-    value = Cell("Test")
+    value = Cell("Test 123")
     output = Cell("")
 
     def prepare_contexts(self):
-        print("create contexts")
         self.contexts["value"]["no_label_float"] = True   # __: opov
 
     def modify_controls(self):
@@ -136,7 +136,7 @@ lvalue:Value{r}|[.value]{l}
 
     @rule
     def _rule_value_changed(self):
-        print("changed value", self.value)
+        print("output changed", repr(self.output), isinstance(self.output, str))
 
 
 class SubGrid(Grid):
@@ -163,6 +163,7 @@ def adjust_size():
 
 
 def main():
+    print("start main")
     root_container = create_window_container(BODY)
 
     frame = Frame()
@@ -173,6 +174,14 @@ def main():
     window.grid = frame.content
     BODY.addEventListener("tabindex-done", tabs_changed)
     window.addEventListener("qtready", adjust_size)
+    console.log("main ready")
 
 
-document.addEventListener('DOMContentLoaded', main)
+def show_ready():
+    print("qt-ready")
+
+
+window.addEventListener("qtready", show_ready)
+
+start_main(main)
+# document.addEventListener('DOMContentLoaded', main)

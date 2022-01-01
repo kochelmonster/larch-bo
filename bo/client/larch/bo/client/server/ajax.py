@@ -1,12 +1,7 @@
-from .endecode import DecoderPipe, EncoderPipe, as_js_object
+from .endecode import DecoderPipe, EncoderPipe, as_js_object, get_api_baseurl
 
 
 # __pragma__("skip")
-class Mock:
-    origin = ""
-
-
-location = Mock()
 def create_ajax(): pass
 def __pragma__(*args): pass
 def postMessage(data): pass
@@ -27,7 +22,7 @@ function create_ajax() {
 }
 ''')
 
-url = location.origin + "/api/ajax/msgpack"
+url = get_api_baseurl() + "/api/ajax/msgpack"
 
 
 def transmit(obj):

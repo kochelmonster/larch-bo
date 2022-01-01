@@ -3,11 +3,12 @@ Javascript wrappers
 """
 from collections import deque
 from time import time
-from .control import EventHandler, BODY
+from .control import EventHandler
+from .browser import loading_modules, BODY
 # __pragma__("skip")
 from larch.bo.packer import parcel
-parcel.NEEDED_PACKAGES.append("vanilla-router")
-document = None
+parcel.NEEDED_PACKAGES.add("vanilla-router")
+document = loading_modules
 window = None
 def require(p): pass
 def __pragma__(*args): pass
@@ -33,8 +34,8 @@ def set_transmitter(session):
     __pragma__("endif")
 
 
-Router = require("vanilla-router")
 __pragma__('js', '{}', '''
+var Router = require("vanilla-router");
 function create_router() {
     return new Router({mode: "history"})
 }

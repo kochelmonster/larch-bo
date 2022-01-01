@@ -2,5 +2,5 @@
 
 # __pragma__("skip")
 from larch.bo.packer import parcel
-parcel.NEEDED_PACKAGES.extend(["msgpack-lite"])
+parcel.NEEDED_PACKAGES.add("msgpack-lite")
 # __pragma__("noskip")

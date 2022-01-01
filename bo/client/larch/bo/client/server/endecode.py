@@ -1,6 +1,8 @@
 
 # __pragma__("skip")
 class Mock:
+    protocol = origin = ""
+
     def createCodec(self, obj):
         pass
 
@@ -11,7 +13,7 @@ class Mock:
         return self
 
 
-Object = None
+location = Object = Mock()
 def require(p): return Mock()
 def __pragma__(*args): pass
 def as_array(d): pass
@@ -53,3 +55,13 @@ def as_js_object(dict_):
     for k, v in dict_.items():
         obj[k] = v
     return obj
+
+
+def get_api_baseurl():
+    if location.protocol == "file:":
+        __pragma__('js', '{}', '''
+        url = new URL(location.href);
+        return "http://localhost:"+url.searchParams.get("transmitter");
+        ''')
+    else:
+        return location.origin

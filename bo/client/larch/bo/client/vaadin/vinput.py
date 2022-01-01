@@ -1,18 +1,23 @@
 from larch.reactive import rule, Cell
 from larch.bo.client.control import Control, register as cregister
+from larch.bo.client.browser import loading_modules, LiveTracker
 
 # __pragma__("skip")
 from larch.bo.packer import parcel
-parcel.NEEDED_PACKAGES.extend([
+parcel.NEEDED_PACKAGES.update([
     "@vaadin/number-field", "@vaadin/integer-field", "@vaadin/text-field"])
-document = None
-def require(p): pass
+document = loading_modules
+def __pragma__(*args): pass
 # __pragma__("noskip")
 
 
-require('@vaadin/text-field')
-require("@vaadin/number-field")
-require("@vaadin/integer-field")
+__pragma__('js', '{}', '''
+loading_modules.push((async () => {
+    await import('@vaadin/text-field');
+    await import("@vaadin/number-field");
+    await import("@vaadin/integer-field");
+})());
+''')
 
 
 class TextControl(Control):
@@ -29,10 +34,19 @@ class TextControl(Control):
         self.element = None
 
     def get_tab_elements(self):
-        return [self.element]
+        return [self.element.inputElement]
 
     def on_change(self, event):
         self.context.value = self.element.value
+
+    def live(self):
+        self._old_value = self.element.value
+        self.tracker = LiveTracker(self._watch_for_change)
+        return self
+
+    def _watch_for_change(self):
+        if self._old_value != self.element.value:
+            self.context.value = self._old_value = self.element.value
 
     @rule
     def _rule_value_changed(self):

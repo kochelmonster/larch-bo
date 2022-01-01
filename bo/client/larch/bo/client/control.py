@@ -1,10 +1,11 @@
 """larch browser objects Rendering engine"""
 import larch.lib.adapter as adapter
 from larch.reactive import Pointer, rcontext, Container, Reactive, Cell, rule
+from .browser import BODY
 
 
 # __pragma__("skip")
-document = None
+document = console = None
 def __pragma__(*args): pass
 # __pragma__("noskip")
 
@@ -15,33 +16,21 @@ def create_control_factory(context):
         value.context = context
         return value
 
-    style = context["style"]  # __: opov
-    control_factory = adapter.get(type(value), Control, style or "")
-    if control_factory:
-        return control_factory(context)
+    if value is not None:
+        style = context["style"]  # __: opov
+        control_factory = adapter.get(type(value), Control, style or "")
+        if control_factory:
+            return control_factory(context)
 
+    console.warn("no control for", value, style, type(value).__name__, repr(context))
     return NullControl(context)
 
 
 def register(type, style=""):
     def wrap(cls):
-        adapter.register(type, Control, style, cls)
+        adapter.register(type, Control, style or "", cls)
         return cls
     return wrap
-
-
-BODY = None
-
-
-def set_body():
-    global BODY
-    BODY = document.querySelector("body")
-
-
-# __pragma__ ('ecom')
-"""?
-document.addEventListener('DOMContentLoaded', set_body)
-?"""
 
 
 class EventHandler:
@@ -96,7 +85,7 @@ class NullControl(Control):
     def render(self, parent):
         self.element = document.createElement("div")
         self.element.style.backgroundColor = "red"
-        self.element.innerText = "NULL"
+        self.element.innerText = "NULL Control"
         parent.appendChild(self.element)
 
 
@@ -164,6 +153,9 @@ class ControlContext(Reactive):
             return v
         return Pointer(v)
 
+    def __repr__(self):
+        return f"<{self.__class__.__name__} {self.options}>"
+
     def __getitem__(self, name):
         value = self.options.get(name)
         if value:
@@ -185,3 +177,41 @@ class ControlContext(Reactive):
             val.set_value(value)
         else:
             self.options[name] = value
+
+
+class RenderingContext(ControlContext):
+    element = Cell()
+
+    def __init__(self, value, parent):
+        super().__init__(value, parent)
+        self.control = None
+        self.old_control_key = None
+
+    def control_key(self):
+        t = type(self.value)
+        style = self['style'] or ""  # __: opov
+        return f"{t.__name__}:{t.__module__}-{style}" if t else None
+
+    def render_to_element(self):
+        self.element.innerHTML = ""
+        self.control.render(self.element)
+
+    def update_tabindex(self):
+        session = self["session"]  # __: opov
+        if session is not None:
+            session.update_tabindex()
+
+    @rule(-1)
+    def _rule_render_control(self):
+        if self.element is None:
+            return
+
+        key = self.control_key()
+        if key != self.old_control_key:
+            yield
+            if self.control is not None:
+                self.control.unlink()
+            self.old_control_key = key
+            self.control = create_control_factory(self)
+            self.render_to_element()
+            self.update_tabindex()
