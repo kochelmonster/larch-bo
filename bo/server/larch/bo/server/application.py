@@ -4,7 +4,8 @@ import sys
 import logging
 import mimetypes
 import socket
-from gevent import spawn, getcurrent, Timeout, GreenletExit
+from time import time
+from gevent import Timeout, GreenletExit
 from werkzeug.wrappers import Request, Response
 from werkzeug.routing import Map, Rule
 from werkzeug.exceptions import HTTPException, BadRequest
@@ -79,7 +80,6 @@ class Application(MsgPacker):
 
         url_map += [
             Rule('/', endpoint='resource'),
-            Rule("/api/ajax/msgpack", endpoint="ajax_binary"),
             Rule('/<path:name>', endpoint='resource')]
 
         self.url_map = Map(url_map)
@@ -133,33 +133,34 @@ class Application(MsgPacker):
             r.cache_control.immutable = True
         return r
 
-    def _test_abortion(self, sock, parent):
-        if not sock.read(16):
-            logger.debug("##abort ajax")
-            parent.kill()
-
     def handle_websocket(self, environ, request):
         ws = environ.get('wsgi.websocket')
         if ws is None:
             raise BadRequest('not a websocket')
 
-        queue_size = self.config.get("wsqueue_size", 100)
         prepare_socket(ws.stream.handler.socket)
         try:
             logger.debug("##handle socket %r", self.server)
-            timeout = self.config.get("wsheartbeat", 30)
+            queue_size = self.config.get("wsqueue_size", 100)
+            heartbeat = self.config.get("wsheartbeat", 30)
+            max_inactive_time = self.config.get("wsmax_inactive_time", 360000)  # vrtually never
+
             active_requests = {}
+            last_active = time()
 
             while True:
-                with Timeout(timeout):
+                with Timeout(heartbeat):
                     try:
                         chunk = ws.receive()
                         if chunk is None:
                             break
                     except Timeout:
+                        if time() - last_active > max_inactive_time and not active_requests:
+                            break
                         ws.send_frame(b"helo", ws.OPCODE_PING)
                         continue
 
+                last_active = time()
                 obj = self.decode(chunk)
                 id_ = obj["id"]
                 request = active_requests.get(id_)
@@ -195,32 +196,6 @@ class Application(MsgPacker):
             pass
         finally:
             active_requests.pop(obj["id"], None)
-
-    def handle_ajax_binary(self, environ, request):
-        logger.debug("##handle_ajax_binary\n%r", environ, stack_info=True)
-
-        obj = self.decode(request.get_data())
-        rfile = environ["wsgi.input"].rfile
-        if obj["action"] == "request":
-            g = spawn(self._test_abortion, rfile.raw, getcurrent())
-            try:
-                result = getattr(self.api, obj["method"])(*obj["args"], **obj["kwargs"])
-            finally:
-                g.kill()
-        else:
-            def reader(obj):
-                yield obj["data"]
-                while True:
-                    chunk = rfile.read()
-                    if not chunk:
-                        return
-                    yield self.decode(chunk)["data"]
-            result = getattr(self.api, obj["method"])(*obj["args"], **obj["kwargs"])
-
-        chunked, data = iter_result(result, obj)
-        response = Response(data, mimetype="text/msgpack")
-        response.direct_passthrough = chunked
-        return response
 
     def handle_range_request(self, request, fileobj, mimetype, etag=None):
         try:

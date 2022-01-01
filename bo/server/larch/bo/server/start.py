@@ -31,9 +31,9 @@ def all_parser():
     parser.add_argument('--type', help='application type', choices=choices, default='server')
     parser.add_argument("--recompile", action='store_true',
                         help="recompiles the resource file before execution")
-    parser.add_argument("--no-module", action='store_true',
-                        help="Do no load javscript as module. This option allows index.html to "
-                        "load as file. Works only with --type=compile")
+    parser.add_argument("--classic", action='store_true',
+                        help="Generate javascript classic code.  This option allows index.html to "
+                        "load as a file. Works only with --type=compile")
     return parser
 
 

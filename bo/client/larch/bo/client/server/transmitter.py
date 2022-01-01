@@ -105,18 +105,20 @@ class Transmitter:
         if obj["action"] == "result":
             request = self.active_requests.pop(obj["id"], None)
             if request:
-                if obj["error"]:
-                    print("error in transmission", obj)
-                    request._reject(obj["error"])
-                else:
-                    request._resolve(obj["result"])
+                request._resolve(obj["result"])
         elif obj["action"] == "item":
             request = self.active_requests.get(obj["id"], None)
             if request:
                 request._receive(obj["item"])
+        elif obj["action"] == "error":
+            error_requests = list(self.active_requests.values())
+            self.active_requests.clear()
+            for r in error_requests:
+                r._reject(obj["result"])
 
 
 def create_worker(url):
+    __pragma__("ifdef", "classic")
     __pragma__('js', '{}', '''
     if (location.protocol == "file:") {
         var tmp = new URL(location.href);
@@ -124,14 +126,18 @@ def create_worker(url):
     }
     return new Worker(url, {type: "classic"});
     ''')
+    __pragma__("else")
+    __pragma__('js', '{}', '''
+    if (location.protocol == "file:") {
+        var tmp = new URL(location.href);
+        url += "?transmitter=" + tmp.searchParams.get("transmitter");
+    }
+    return new Worker(url, {type: "module"});
+    ''')
+    __pragma__("endif")
 
 
 def set_tmt(session):
-    __pragma__("ifdef", "ajax")
-    worker = create_worker("./ajax.js")
-    __pragma__("else")
     worker = create_worker("./socket.js")
-    __pragma__("endif")
-
     window.transmitter = Transmitter(worker)
     session.extern = window.transmitter.api

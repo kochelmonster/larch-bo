@@ -1,5 +1,7 @@
 """PySide6 WebEngineWidgets Example"""
 import logging
+from time import sleep
+from urllib.request import urlopen
 from PySide6.QtWidgets import QMainWindow, QApplication
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtCore import Signal, QFileSystemWatcher
@@ -35,3 +37,15 @@ def install_watcher(config, browser_windows):
     watcher = QFileSystemWatcher([str(config.get("resource_path"))], QApplication.instance())
     watcher.directoryChanged.connect(reload_all)
     logger.info("started watcher\n%r", watcher.directories())
+
+
+def wait_for_server(url):
+    print("wait for server startup", url)
+    for i in range(10):
+        try:
+            urlopen(url)
+            return
+        except Exception:
+            sleep(1)
+    else:
+        urlopen(url)

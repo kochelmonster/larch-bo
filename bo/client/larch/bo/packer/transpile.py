@@ -44,6 +44,7 @@ def transpile_transmitter(linker):
     if not transmitter:
         return
 
+    transmitter = "socket"
     linker.transmitter = transmitter + ".js"
 
     import larch.bo.client.server as lbcs
@@ -80,7 +81,16 @@ def transpile(linker):
     symbols = [linker.config.get("platform", sys.platform)]
     transmitter = linker.config.get("transmitter")
     if transmitter is not None:
+        transmitter = "socket"
         symbols.append(transmitter)
+
+    try:
+        classic = linker.config["args"].classic
+    except (AttributeError, KeyError):
+        classic = False
+
+    if classic:
+        symbols.append("classic")
 
     symbols = ' '.join("-s " + s for s in symbols)
     cmd += f" {symbols}"
@@ -169,4 +179,4 @@ def watch(linker, wait_for_change):
 
 
 def start_watcher(linker, wait_for_change):
-    return spawn(watch, linker, wait_for_change)
+    return [spawn(watch, linker, wait_for_change)]

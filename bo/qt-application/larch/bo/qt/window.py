@@ -449,7 +449,8 @@ class BrowserWindow(QMainWindow):
 def start_frontend(url, config, filewatch=False):
     app = QApplication([])
     logger.info("start main window with url %r", url)
-    BrowserWindow(url, config)
+    w = BrowserWindow(url, config)
+    w.show()
 
     if filewatch:
         from .debug import install_watcher

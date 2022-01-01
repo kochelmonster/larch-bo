@@ -1,4 +1,12 @@
-"""PySide6 WebEngineWidgets Example"""
+"""
+Start pyside browser
+
+In debug mode (config["debug"] == True) the code is compiled in javascipt module mode
+and the browser uses the server to access the javascript app.
+
+In production mode the code is compiled as classic modules (with an extra inserted "use strict"
+at each module). And the browser directly calls the index from file:// domain
+"""
 import os
 import sys
 import argparse
@@ -38,6 +46,8 @@ def run(root, config=None, application=None):
 
     if type_ in ("compile", "server"):
         from larch.bo.server import run
+        if not config.get("debug"):
+            sys.argv.append("--classic")
         config = config or {}
         config["wsheartbeat"] = 0  # websocket heartbeat not needed
         config["runtype"] = "local"
@@ -61,14 +71,22 @@ def run(root, config=None, application=None):
             check_for_compile(config)
 
         url = "file://" + str(Path(resource_path)/"index.html")
-        if config.get("transmitter") or type_ == "debug":
+        if config.get("transmitter") or config.get("debug"):
             port = get_free_port()
+
             args = [sys.executable] + sys.argv + [f"--port={port}"]
             new_environ = os.environ.copy()
             new_environ["LARCH_BO_QT_FRONTEND_STARTED"] = "server"
             new_environ["LARCH_START"] = "qt-server"
             server_process = Popen(args, env=new_environ, encoding="utf8")
-            url += f"?transmitter={port}"
+
+            if config.get("debug"):
+                from .debug import wait_for_server
+                url = f"http://localhost:{port}/index.html"
+                wait_for_server(url)
+            else:
+                url += f"?transmitter={port}"
+
             try:
                 return start_frontend(url, config, type_ == "debug")
             finally:

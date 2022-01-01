@@ -20,12 +20,6 @@ __pragma__('ecom')
 
 
 def set_transmitter(session):
-    __pragma__("ifdef", "ajax")
-    """?
-    from .server.transmitter import set_tmt
-    set_tmt(session)
-    ?"""
-    __pragma__("endif")
     __pragma__("ifdef", "socket")
     """?
     from .server.transmitter import set_tmt

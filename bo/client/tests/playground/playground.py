@@ -26,6 +26,23 @@ if __name__ == "__main__":
 # ---------------------------------------------------
 # __pragma__ ("noskip")
 
+__pragma__('js', '{}', '''
+
+var msgpack = require("msgpack-lite");
+console.log("does not like strict?")
+
+// encode from JS Object to MessagePack (Buffer)
+var buffer = msgpack.encode({"foo": "bar"});
+console.log("encoded", buffer);
+
+window.result = buffer;
+
+// decode from MessagePack (Buffer) to JS Object
+var data = msgpack.decode(buffer); // => {"foo": "bar"}
+console.log("decoded", data);
+
+''')
+
 
 # __pragma__("kwargs")
 def kwargtest(a=1, b=2, c=3, **kwargs):

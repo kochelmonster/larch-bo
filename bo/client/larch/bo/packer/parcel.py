@@ -110,6 +110,24 @@ def make(linker):
     if linker.transmitter:
         patch_msgpack(linker.config["resource_path"]/linker.transmitter)
 
+    try:
+        classic = linker.config["args"].classic
+    except (AttributeError, KeyError):
+        classic = False
+
+    if classic:
+        make_strict(linker)
+
+
+def make_strict(linker):
+    """add use strict to the main output"""
+    for f in linker.config["resource_path"].iterdir():
+        if f.suffix == ".js":
+            print("make strict", f)
+            js = f.read_text()
+            if not js.startswith("'use strict'"):
+                f.write_text("'use strict';\n" + js)
+
 
 def watch(linker):
     environ = os.environ.copy()
@@ -130,7 +148,7 @@ def watch(linker):
         process.kill()
 
 
-def start_watcher(linker):
+def start_watcher(linker, wait_for_change):
     main_name = Path(linker.config["root"]).with_suffix(".js")
     make_package_json(linker, "main", main_name.name)
     if linker.transmitter:
@@ -140,4 +158,4 @@ def start_watcher(linker):
     if linker.transmitter and not (respath/linker.transmitter).exists():
         make(linker)
 
-    return spawn(watch, linker)
+    return [spawn(watch, linker)]

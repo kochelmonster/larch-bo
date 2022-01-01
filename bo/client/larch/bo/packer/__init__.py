@@ -24,4 +24,5 @@ def start_watcher(config, wait_for_change):
         transpile.make(linker_)
         transpile.extend_manifest(linker_)
 
-    return [transpile.start_watcher(linker_, wait_for_change), parcel.start_watcher(linker_)]
+    return (transpile.start_watcher(linker_, wait_for_change)
+            + parcel.start_watcher(linker_, wait_for_change))

@@ -37,10 +37,10 @@ if __name__ == "__main__":
     config = {
         "debug": True,
         "api": GridApi(),
-        "transmitter": "socket",
+        "transmitter": True,
         "window": {
             "frameless": False,
-            "debugger": False,
+            "debugger": True,
             "width": 0,
             "height": 0,
         }

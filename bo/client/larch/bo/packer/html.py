@@ -43,13 +43,12 @@ def make(linker):
 
     root = linker.config["resource_path"]/Path(linker.config["root"]).name
 
-    print("**options args", linker.config["args"])
-    if linker.config["args"].no_module:
-        jstype = "text/Javascript"
-        make_strict(linker)
-    else:
-        jstype = "module"
+    try:
+        classic = linker.config["args"].classic
+    except (AttributeError, KeyError):
+        classic = False
 
+    jstype = "text/javascript" if classic else "module"
     js_links = create_js_links(root, type_=jstype)
     css_links = create_css_links(root)
 
@@ -59,14 +58,6 @@ def make(linker):
 
     with open(linker.config["resource_path"]/"index.html", "w") as f:
         f.write("".join(line.strip() for line in html.splitlines()))
-
-
-def make_strict(linker):
-    """add use strict to the main output"""
-    for f in linker.config["resource_path"].iterdir():
-        print("make strict", f, f.suffix)
-        if f.suffix == ".js":
-            f.write_text("'use strict';\n" + f.read_text())
 
 
 def make_icon_list(linker):
