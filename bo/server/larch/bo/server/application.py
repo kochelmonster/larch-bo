@@ -12,7 +12,6 @@ from werkzeug.exceptions import HTTPException, BadRequest
 from msgpack import packb, Unpacker
 from larch.lib.aspect import pointcut
 from larch.lib.gevent import Queue
-# from .session import Session, MsgDecoder
 from .resource import ResourceManager
 
 
@@ -33,21 +32,21 @@ class ApplicationPointcut:
         """the application shutsdown."""
 
 
-class MsgPacker:
+class MsgDecoder:
     EXT_TYPES = {}
 
     def __init__(self):
-        self.unpacker = Unpacker(raw=False, ext_hook=self._ext_hook)
+        self.unpacker = Unpacker(raw=False, strict_map_key=False, ext_hook=self._ext_hook)
 
     def decode(self, data):
         self.unpacker.feed(data)
-        return self.unpacker.unpack()
+        return self.unpacker
 
     def _ext_hook(self, code, data):
         return self.EXT_TYPES.get(code, lambda d: d)(data)
 
 
-class Application(MsgPacker):
+class Application:
     """The Baseclass for lui applications. Responsible for Driving the
     larch.ui.application.
 
@@ -147,6 +146,7 @@ class Application(MsgPacker):
 
             active_requests = {}
             last_active = time()
+            decode = MsgDecoder().decode
 
             while True:
                 with Timeout(heartbeat):
@@ -161,23 +161,25 @@ class Application(MsgPacker):
                         continue
 
                 last_active = time()
-                obj = self.decode(chunk)
-                id_ = obj["id"]
-                request = active_requests.get(id_)
-                if request is None:
-                    if obj["action"] == "stream":
-                        q = Queue(queue_size)
-                        q.put(obj["data"])
-                        obj["args"] = (q,)
+                for obj in decode(chunk):
+                    logger.debug("received request %r\n%r", obj["id"], obj)
+                    id_ = obj["id"]
+                    request = active_requests.get(id_)
+                    if request is None:
+                        if obj["action"] == "stream":
+                            q = Queue(queue_size)
+                            q.put(obj["data"])
+                            obj["args"] = (q,)
 
-                    obj["greenlet"] = self.server._spawn(
-                        self.handle_socket_request, ws, obj, active_requests)
-                    active_requests[id_] = obj
-                else:
-                    if request["action"] == "stream":
-                        request["args"][0].put(obj["data"])
+                        obj["greenlet"] = self.server._spawn(
+                            self.handle_socket_request, ws, obj, active_requests)
+                        active_requests[id_] = obj
                     else:
-                        request["greenlet"].kill()
+                        if obj["action"] == "stream":
+                            request["args"][0].put(obj["data"])
+                        else:
+                            logger.debug("##kill worker\n%r\n%r", request, obj)
+                            request["greenlet"].kill()
         except Exception as e:
             ws.close(1006)
             logger.exception("error handling websocket %r", e)
@@ -190,8 +192,14 @@ class Application(MsgPacker):
         compress = self.config.get("wscompress", 8192)
         try:
             result = getattr(self.api, obj["method"])(*obj["args"], **obj["kwargs"])
-            for p in iter_result(result, obj)[1]:
+            for o in iter_result(result, obj)[1]:
+                p = packb(o)
+                logger.debug("send response %r\n%r", len(p), o)
                 sock.send(p, True, len(p) >= compress)
+        except Exception as e:
+            logger.exception("exception executing %r\n%r", e, obj)
+            p = packb({"action": "error", "id": obj["id"], "error": {"msg": repr(e)}})
+            sock.send(p, True, len(p) >= compress)
         except GreenletExit:
             pass
         finally:
@@ -245,23 +253,21 @@ def iter_result(result, obj):
     if isinstance(result, GENTYPE):
         def create_result():
             for r in result:
-                yield packb({
+                yield {
                     "id": obj["id"],
                     "action": "item",
-                    "item": r
-                })
-                logger.debug("yield item", stack_info=True)
+                    "item": r}
 
-            yield packb({
+            yield {
                 "id": obj["id"],
                 "action": "result",
                 "result": None
-            })
+            }
         return True, create_result()
 
     else:
-        return False, [packb({
+        return False, [{
             "id": obj["id"],
             "action": "result",
             "result": result
-            })]
+            }]

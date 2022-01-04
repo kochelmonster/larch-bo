@@ -84,6 +84,14 @@ def transpile(linker):
         transmitter = "socket"
         symbols.append(transmitter)
 
+    verbosity = linker.config.get("verbosity", 0)
+    if verbosity >= 1:
+        symbols.append("verbose1")
+    if verbosity >= 2:
+        symbols.append("verbose1")
+    if verbosity >= 3:
+        symbols.append("verbose3")
+
     try:
         classic = linker.config["args"].classic
     except (AttributeError, KeyError):

@@ -1,7 +1,7 @@
 from collections import deque
 from larch.reactive import Reactive, Cell, rule
 # __pragma__("skip")
-document = window = None
+document = window = Object = None
 def __pragma__(*args): pass
 # __pragma__("noskip")
 

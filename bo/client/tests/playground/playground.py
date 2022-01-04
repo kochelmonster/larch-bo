@@ -1,6 +1,6 @@
 # import larch.lib.adapter as adapter
 from larch.bo.client.browser import start_main
-from larch.reactive import Cell, rule, atomic, Reactive
+from larch.bo.client.textlayout import LayoutBuilder
 
 # __pragma__("skip")
 # ---------------------------------------------------
@@ -26,33 +26,13 @@ if __name__ == "__main__":
 # ---------------------------------------------------
 # __pragma__ ("noskip")
 
-__pragma__('js', '{}', '''
-
-var msgpack = require("msgpack-lite");
-console.log("does not like strict?")
-
-// encode from JS Object to MessagePack (Buffer)
-var buffer = msgpack.encode({"foo": "bar"});
-console.log("encoded", buffer);
-
-window.result = buffer;
-
-// decode from MessagePack (Buffer) to JS Object
-var data = msgpack.decode(buffer); // => {"foo": "bar"}
-console.log("decoded", data);
-
-''')
-
-
-# __pragma__("kwargs")
-def kwargtest(a=1, b=2, c=3, **kwargs):
-    return a, b, c, kwargs
-# __pragma__("nokwargs")
-
 
 def main():
-    test = kwargtest(b="test", u=3)
-    print("test", test)
+    b = LayoutBuilder()
+    row1 = b.columns("[test]", "label", "<1>")
+    row2 = b.columns("a", "b", "<1>")
+    console.log(row1.join())
+    console.log(row2.join())
 
 
 start_main(main)

@@ -361,12 +361,13 @@ class LayoutBuilder:
                         yield c.strip()
 
         if not cols:
-            result = patch_join(self, ([""] * len(self.sizes)))
+            result = patch_join(self, [[""] for i in range(len(self.sizes))])
         else:
             result = patch_join(self, iter_cols())
 
         if len(result) > len(self.sizes):
-            self.sizes.extend([0]*(len(result)-len(self.sizes)))
+            for i in range(len(result) - len(self.sizes)):
+                self.sizes.append([0])
 
         for i, c in enumerate(result):
             self.sizes[i] = max(len(c), self.sizes[i])
@@ -388,7 +389,7 @@ def patch_join(builder, sequence):
     def join():
         def padd(string, size):
             if len(string) < size:
-                return string + " "*(size-len(string))
+                return string + "".join([" " for i in range(size-len(string))])
             return string
 
         return "|".join(padd(c, s) for c, s in zip(result, builder.sizes))

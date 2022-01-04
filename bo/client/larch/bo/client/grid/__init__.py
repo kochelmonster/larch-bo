@@ -4,7 +4,7 @@ from ..textlayout import DOMCell, Empty, AlignedCell, Parser, Stretcher, RowSpan
 from ..control import Control, RenderingContext
 
 # __pragma__("skip")
-document = None
+console = document = None
 def require(n): pass
 # __pragma__ ("noskip")
 
@@ -87,13 +87,14 @@ class Field(AlignedCell):
 
     def create(self, grid):
         pointer = Pointer(grid) if self.path.startswith(".") else grid.context.value_pointer
-        return FieldContext(walk_pointer(pointer, self.path), grid.context, self)
+        pointer = walk_pointer(pointer, self.path)
+        return FieldContext(pointer, grid.context, self)
 
     def render(self, grid):
         el = document.createElement("div")
         self.set_css_style(el.style)
         grid.element.appendChild(el)
-        grid.contexts[self.name].element = el
+        grid.contexts[self.name].container = el
 
 
 class Spacer(DOMCell):
@@ -136,6 +137,7 @@ class Grid(Control):
     """
 
     layout_cache = {}
+    fields = []
     element = None
 
     @property
@@ -188,7 +190,8 @@ class Grid(Control):
         if not self.context["id"]:
             self.context["id"] = self.__class__.__name__
         self.context.control = self
-        self.element = document.createElement("div")
+        self.element = el = document.createElement("div")
+        el.classList.add("lbo-grid")
         parent.appendChild(self.element)
         self.render_to_dom()
 
@@ -200,24 +203,28 @@ class Grid(Control):
 
     def unlink(self):
         super().unlink()
+        self.unlink_children()
         self.element = None
+
+    def unlink_children(self):
         for ctrl in self.iter_fields_controls():
-            ctrl.context.control = None
+            ctrl.context.container = None
             ctrl.unlink()
 
     def render_to_dom(self):
+        self.unlink_children()
         self._make_cells()
         element = self.element
-        element.classList.add("lbo-grid")
+        element.innerHTML = ""
         element.style["grid-template-columns"] = " ".join(
             [f"{c}fr" if c else "auto" for c in self.column_stretchers])
         element.style["grid-template-rows"] = " ".join(
             [f"{c}fr" if c else "auto" for c in self.row_stretchers])
 
-        # __pragma__("opov")
-        if self.row_stretchers:
-            # __pragma__("noopov")
+        if sum(self.row_stretchers):
             element.style.height = "100%"
+        else:
+            element.style.height = ""
 
         for name, c in self.cells.items():
             c.render(self)
@@ -246,10 +253,11 @@ class Grid(Control):
 
     @rule
     def _rule_update_cells(self):
-        self.layout
-        yield
-        if self.element:
-            self.render_to_dom()
+        if self.context:
+            self.layout
+            yield
+            if self.element:
+                self.render_to_dom()
 
 
 def move(operation, lc, lr):

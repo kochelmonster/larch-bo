@@ -2,16 +2,25 @@ from .browser import BODY, get_bubble_attribute
 
 
 # __pragma__("skip")
-window = navigator = None
+class Mock:
+    pass
+
+
+console = Intl = window = navigator = Mock()
 def require(n): pass
+def __new__(*args): pass
 # __pragma__ ("noskip")
 
 
-# window.translations = {}
+window.translations = {}
 
 
-def get_lang():
-    return get_bubble_attribute(BODY, "lang", navigator.language)
+def get_lang(element=None):
+    if element is None:
+        element = BODY
+    lang = get_bubble_attribute(element, "lang", navigator.language)
+    element.lang = lang
+    return lang
 
 
 def gettext(text):
@@ -37,3 +46,8 @@ def label(description):
         func.__label__ = description
         return func
     return wrapped
+
+
+def create_number_formatter(style, element=None):
+    lang = get_lang(element)
+    return __new__(Intl.NumberFormat(lang, style)).format

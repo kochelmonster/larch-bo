@@ -20,7 +20,11 @@ def create_control_factory(context):
         style = context["style"]  # __: opov
         control_factory = adapter.get(type(value), Control, style or "")
         if control_factory:
-            return control_factory(context)
+            control = control_factory(context)
+            __pragma__("ifdef", "verbose2")
+            console.log("create control", repr(value), repr(control))
+            __pragma__("endif")
+            return control
 
     console.warn("no control for", value, style, type(value).__name__, repr(context))
     return NullControl(context)
@@ -61,6 +65,7 @@ class EventHandler:
     def unlink(self):
         for name, element, listener in self.bound_events:
             element.removeEvent(name, listener)
+        super().unlink()
     # __pragma__("notconv")
 
 
@@ -70,6 +75,9 @@ class Control(Reactive):
         if not isinstance(context_or_value, ControlContext):
             context_or_value = ControlContext(context_or_value)
         self.context = context_or_value
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}>"
 
     def unlink(self):
         pass
@@ -141,6 +149,7 @@ class ControlContext(Reactive):
 
     @value.setter
     def value(self, val):
+        console.log("set value", repr(val))
         if isinstance(self._value, Pointer):
             self._value.__call__(val)
         else:
@@ -152,6 +161,11 @@ class ControlContext(Reactive):
         if isinstance(v, Pointer):
             return v
         return Pointer(v)
+
+    def update_tabindex(self):
+        session = self["session"]  # __: opov
+        if session is not None:
+            session.update_tabindex()
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.options}>"
@@ -180,30 +194,27 @@ class ControlContext(Reactive):
 
 
 class RenderingContext(ControlContext):
-    element = Cell()
+    container = Cell()
 
-    def __init__(self, value, parent):
-        super().__init__(value, parent)
+    # __pragma__ ('kwargs')
+    def __init__(self, value, parent, **kwargs):
+        super().__init__(value, parent, **kwargs)
         self.control = None
         self.old_control_key = None
+    # __pragma__ ('nokwargs')
 
     def control_key(self):
         t = type(self.value)
         style = self['style'] or ""  # __: opov
         return f"{t.__name__}:{t.__module__}-{style}" if t else None
 
-    def render_to_element(self):
-        self.element.innerHTML = ""
-        self.control.render(self.element)
-
-    def update_tabindex(self):
-        session = self["session"]  # __: opov
-        if session is not None:
-            session.update_tabindex()
+    def render_to_container(self):
+        self.container.innerHTML = ""
+        self.control.render(self.container)
 
     @rule(-1)
     def _rule_render_control(self):
-        if self.element is None:
+        if self.container is None:
             return
 
         key = self.control_key()
@@ -213,5 +224,5 @@ class RenderingContext(ControlContext):
                 self.control.unlink()
             self.old_control_key = key
             self.control = create_control_factory(self)
-            self.render_to_element()
+            self.render_to_container()
             self.update_tabindex()

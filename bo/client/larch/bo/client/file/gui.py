@@ -1,20 +1,25 @@
 """an upload gui"""
 from larch.reactive import Cell, rule
+from ..i18n import label, create_number_formatter
 from ..control import register
 from ..grid import Grid
 from ..textlayout import LayoutBuilder
-from ..browser import get_bubble_attribute
 from . import FileItem, FileUploader
 
 
 # __pragma__("skip")
-navigator = None
+navigator = console = None
 # __pragma__("noskip")
 
 
+# just for msggettxt
+def pgettext(context, n): return n
+
+
 @register(FileUploader)
+@register(FileUploader, "content")
 class FileUploaderControl(Grid):
-    layout = Cell()
+    layout = Cell("")
 
     @property
     def files(self):
@@ -26,28 +31,35 @@ class FileUploaderControl(Grid):
 
     @rule
     def _rule_update_layout(self):
-        self.file_count
-        yield
-        builder = LayoutBuilder()
-        rows = [builder.columns("[.files[{}]]".format(i)) for i in range(len(self.files))]
-        rows.append(builder.columns("<1>"))
-        return "\n".join(r.join() for r in rows)
+        if self.file_count:
+            yield
+            builder = LayoutBuilder()
+            rows = [builder.columns("[.files[{}]]".format(i)) for i in range(len(self.files))]
+            rows.append(builder.columns("<1>"))
+            self.layout = "\n".join(r.join() for r in rows)
 
 
 @register(FileItem)
 class FileItemControl(Grid):
     layout = """
-[name]|[.loaded_string]|[abort]
-[loaded]@progress
+[name_]{m}@text|[.sent_bytes_string]{rm}@text|(2em,0)|[.abort]{m}
+pg:[sent_bytes]@progress
+               |<1>                          |
 """
 
     @property
-    def loaded_string(self):
-        return to_human(self.value.loaded, self.lang)
+    def sent_bytes_string(self):
+        return (to_human(self.context.value.sent_bytes, self.element)
+                + "/" + to_human(self.context.value.size, self.element))
 
-    def render(self, parent):
-        self.lang = get_bubble_attribute(parent, "lang", navigator.language)
-        super().render(parent)
+    def modify_controls(self):
+        progress = self.celement("pg")
+        progress.min = 0
+        progress.max = self.context.value.size
+
+    @label(pgettext("dialog", "Abort"))
+    def abort(self):
+        self.context.value.abort()
 
 
 KILO = 1000
@@ -55,12 +67,18 @@ MEGA = 1000*KILO
 GIGA = 1000*MEGA
 
 
-def to_human(value, lang):
-    if value > 10*GIGA:
-        return int(value / 10*GIGA).toLocaleString(lang, {"style": "unit", "unit": "gigabyte"})
-    elif value > 10*MEGA:
-        return int(value / 10*MEGA).toLocaleString(lang, {"style": "unit", "unit": "megabyte"})
-    elif value > 10*KILO:
-        return int(value / 10*KILO).toLocaleString(lang, {"style": "unit", "unit": "kilobyte"})
+def to_human(value, element):
+    # __pragma__("jsiter")
+    if value >= 10*GIGA:
+        f = create_number_formatter({"style": "unit", "unit": "gigabyte"}, element)
+        return f(value / (10*GIGA))
+    elif value >= 10*MEGA:
+        f = create_number_formatter({"style": "unit", "unit": "megabyte"}, element)
+        return f(value / (10*MEGA))
+    elif value >= 10*KILO:
+        f = create_number_formatter({"style": "unit", "unit": "kilobyte"}, element)
+        return f(value / (10*KILO))
 
-    return value.toLocaleString(lang, {"style": "unit", "unit": "byte"})
+    f = create_number_formatter({"style": "unit", "unit": "byte"}, element)
+    # __pragma__("nojsiter")
+    return f(value)

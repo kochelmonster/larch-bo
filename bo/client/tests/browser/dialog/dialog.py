@@ -65,11 +65,11 @@ class Hello(Grid):
     def ok(self):
         print("ok", self.parent)
         self.result = True
-        self.parent.close()
+        self.context["dialog"].close()  # __:opov
 
     def cancel(self):
         print("cancel", self.parent)
-        self.parent.close()
+        self.context["dialog"].close()  # __:opov
 
     @rule
     def _rule_make_msg(self):
@@ -89,8 +89,8 @@ class Actions(Grid):
 
     @label("Open Dialog")
     def open_dialog(self):
-        dialog = vdialog.Dialog(ControlContext(Hello(), self.context))
-        dialog.modal(self.dialog_done, draggable=True, resizable=True)
+        dialog = vdialog.Dialog(Hello(), self.context)
+        dialog.modal(self.dialog_done, style="min-width: 40%", draggable=True, resizable=True)
 
     def dialog_done(self, dialog):
         print("dialog done", dialog.value.result)

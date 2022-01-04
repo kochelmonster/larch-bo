@@ -1,11 +1,10 @@
-from larch.reactive import rule
-from larch.bo.client.control import Control, RenderingContext
+from larch.bo.client.control import RenderingContext
 from larch.bo.client.browser import loading_modules, BODY
 
 # __pragma__("skip")
 from larch.bo.packer import parcel
 parcel.NEEDED_PACKAGES.add("@vaadin/dialog")
-document = loading_modules
+console = document = loading_modules
 def __pragma__(*args): pass
 # __pragma__("noskip")
 
@@ -18,37 +17,41 @@ loading_modules.push((async () => {
 
 
 class DialogContentContext(RenderingContext):
-    def render_to_element(self):
+    def render_to_container(self):
         pass
 
 
-class Dialog(Control):
+class Dialog:
     TAG = "vaadin-dialog"
 
-    def __init__(self, cv=None):
-        super().__init__(cv)
-        self.content_context = DialogContentContext(None, self.context)
+    # __pragma__ ('kwargs')
+    def __init__(self, value, parent=None, **kwargs):
+        self.context = DialogContentContext(value, parent, dialog=self, **kwargs)
         self.result_callback = None
+    # __pragma__ ('nokwargs')
 
     @property
     def element(self):
-        return self.content_context.element
+        return self.context.container
 
     @property
     def value(self):
         return self.context.value
 
     # __pragma__("kwargs")
-    def modal(self, result_callback, **kwargs):
-        self.context.control = self
+    def modal(self, result_callback, style=None, klass=None, **kwargs):
         self.result_callback = result_callback
         dialog = document.createElement(self.TAG)
         dialog.renderer = self._render_into_dialog
         BODY.append(dialog)
-        self.content_context.element = dialog
+        self.context.container = dialog
         for id_, value in kwargs.items():
             dialog[id_] = value
         dialog.opened = True
+        if style is not None:
+            dialog["$"].overlay["$"].overlay.style = style
+        if klass is not None:
+            dialog["$"].overlay["$"].overlay.className = klass
         dialog.addEventListener("opened-changed", self.on_open_changed)
     # __pragma__("nokwargs")
 
@@ -59,7 +62,6 @@ class Dialog(Control):
         raise RuntimeError("Do not use render on Dialogs")
 
     def on_open_changed(self, event):
-        print("on_open_changed", event, self.element.opened)
         if not self.element.opened:
             if self.result_callback:
                 self.result_callback(self)
@@ -67,9 +69,9 @@ class Dialog(Control):
 
     def _render_into_dialog(self, root, dialog):
         root.innerHTML = ""
-        if self.content_context.control:
-            self.content_context.control.render(root)
-            self.content_context.update_tabindex()
+        if self.context.control:
+            self.context.control.render(root)
+            self.context.update_tabindex()
 
     def unlink(self):
         super().unlink()
@@ -78,9 +80,5 @@ class Dialog(Control):
         self.content_context.element = None
 
     def get_tab_elements(self):
-        control = self.content_control.control
+        control = self.context.control
         return control.get_tab_elements() if control is not None else []
-
-    @rule
-    def _rule_synch_values(self):
-        self.content_context.value = self.context.value

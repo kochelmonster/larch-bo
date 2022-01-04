@@ -62,7 +62,7 @@ class Session(EventHandler):
     def set_root(self, root):
         self.root = root
         self.container.innerHTML = ""
-        root.render(self.container)
+        root.context.control = root.render(self.container)
 
     def add_route(self, path, creator):
         self.router.add(path, creator)

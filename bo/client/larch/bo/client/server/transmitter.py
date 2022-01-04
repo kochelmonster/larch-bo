@@ -2,22 +2,17 @@ import time
 from ..browser import create_promise, as_array
 
 # __pragma__("skip")
-location = Object = window = None
+console = location = Object = window = URL = Worker = None
 def __pragma__(*args): pass
+def __new__(a): pass
 # __pragma__("noskip")
-
-
-def as_js_object(dict_):
-    obj = Object.create(None)
-    for k, v in dict_.items():
-        obj[k] = v
-    return obj
 
 
 class RequestPromise:
     def __init__(self, id):
         self.id = id
         self.started = time.time()
+        self._receive = self._reject = self._resolve = lambda x: None
         self.promise = create_promise(self._set_funcs)
 
     def then(self, *args):
@@ -59,42 +54,54 @@ class Transmitter:
     def request(self, method, *args, **kwargs):
         self.id_counter += 1
         id_ = self.id_counter
-        obj = as_js_object({
+        # __pragma__("jsiter")
+        obj = {
             "action": "request",
             "id": id_,
             "method": method,
             "args": as_array(args),
-            "kwargs": as_js_object(kwargs)
-        })
+            "kwargs": to_jsobject(kwargs)
+        }
+        # __pragma__("nojsiter")
         self.worker.postMessage(obj)
         r = self.active_requests[id_] = RequestPromise(id_)
         return r
     # __pragma__("nokwargs")
 
-    def put_start(self, method, data):
+    # __pragma__("kwargs")
+    def put_start(self, method, data, **kwargs):
         self.id_counter += 1
         id_ = self.id_counter
-        obj = as_js_object({
+        # __pragma__("jsiter")
+        obj = {
             "action": "stream",
             "id": id_,
             "method": method,
-            "data": data
-        })
+            "data": data,
+            "kwargs": to_jsobject(kwargs)
+        }
+        # __pragma__("nojsiter")
         self.worker.postMessage(obj)
         r = self.active_requests[id_] = RequestPromise(id_)
         return r
+    # __pragma__("nokwargs")
 
     def put_more(self, id_, data):
-        obj = as_js_object({
+        # __pragma__("jsiter")
+        obj = {
             "action": "stream",
             "id": id_,
             "data": data
-        })
+        }
+        # __pragma__("nojsiter")
         self.worker.postMessage(obj)
 
     def abort_request(self, id_):
         request = self.active_requests.pop(id_, None)
         if request is not None:
+            __pragma__("ifdef", "verbose1")
+            console.log("abort request", request)
+            __pragma__("endif")
             self.worker.postMessage({
                 "action": "cancel",
                 "id": id_
@@ -105,39 +112,60 @@ class Transmitter:
         if obj["action"] == "result":
             request = self.active_requests.pop(obj["id"], None)
             if request:
-                request._resolve(obj["result"])
+                request._resolve(to_object(obj["result"]))
         elif obj["action"] == "item":
             request = self.active_requests.get(obj["id"], None)
+            console.log("***received item", obj)
             if request:
-                request._receive(obj["item"])
+                request._receive(to_object(obj["item"]))
         elif obj["action"] == "error":
-            error_requests = list(self.active_requests.values())
-            self.active_requests.clear()
-            for r in error_requests:
-                r._reject(obj["result"])
+            console.error("an error occured from transmission", obj)
+            if obj["id"]:
+                request = self.active_requests.get(obj["id"], None)
+                request._reject(to_object(obj["error"]))
+            else:
+                error_requests = list(self.active_requests.values())
+                self.active_requests.clear()
+                for r in error_requests:
+                    r._reject(to_object(obj))
+
+
+def to_object(jsobj):
+    __pragma__("js", "{}", """
+    if (typeof jsobj != "object")
+        return jsobj;
+    """)
+    result = {}
+    # __pragma__("jsiter")
+    for k in jsobj:
+        result[k] = jsobj[k]
+    # __pragma__("nojsiter")
+    return result
+
+
+def to_jsobject(pyobj):
+    result = {}  # __:jsiter
+    for k, v in pyobj.items():
+        result[k] = v
+    return result
 
 
 def create_worker(url):
+    if (location.protocol == "file:"):
+        tmp = __new__(URL(location.href))
+        url += "?transmitter=" + tmp.searchParams.get("transmitter")
+
+    __pragma__("jsiter")
     __pragma__("ifdef", "classic")
-    __pragma__('js', '{}', '''
-    if (location.protocol == "file:") {
-        var tmp = new URL(location.href);
-        url += "?transmitter=" + tmp.searchParams.get("transmitter");
-    }
-    return new Worker(url, {type: "classic"});
-    ''')
+    return __new__(Worker(url, {"type": "classic"}))
     __pragma__("else")
-    __pragma__('js', '{}', '''
-    if (location.protocol == "file:") {
-        var tmp = new URL(location.href);
-        url += "?transmitter=" + tmp.searchParams.get("transmitter");
-    }
-    return new Worker(url, {type: "module"});
-    ''')
+    return __new__(Worker(url, {"type": "module"}))
     __pragma__("endif")
+    __pragma__("nojsiter")
 
 
 def set_tmt(session):
     worker = create_worker("./socket.js")
     window.transmitter = Transmitter(worker)
     session.extern = window.transmitter.api
+    session.transmitter = window.transmitter

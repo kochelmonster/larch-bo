@@ -3,15 +3,20 @@ class Mock:
     protocol = origin = ""
 
 
-Object = location = Mock()
+console = Object = location = Mock()
 def create_websocket(u): pass
 def __pragma__(*args): pass
 def postMessage(data): pass
 def setTimeout(func, delta): pass
 def require(p): pass
 def create_array(): pass
-def decode(d): pass
+def feed(d): pass
+def create_decoder(d): pass
+
 # __pragma__("noskip")
+
+
+msgpack = require("msgpack-lite")
 
 
 __pragma__('js', '{}', '''
@@ -27,10 +32,26 @@ function create_array() {
     return [];
 }
 
-function decode(buffer) {
-    return msgpack.decode(new Uint8Array(buffer));
+function create_decoder(callback) {
+    var codec = msgpack.createCodec({preset: true, safe: false});
+    var decoder = msgpack.Decoder({codec: codec});
+    decoder.push = callback;
+    return decoder;
+}
+
+function feed(data) {
+    decoder.write(new Uint8Array(data));
+    decoder.flush();
 }
 ''')
+
+
+def obj_receive(obj):
+    console.log("receive obj", obj)
+    postMessage(obj)
+
+
+decoder = create_decoder(obj_receive)
 
 
 def get_api_baseurl():
@@ -42,15 +63,6 @@ def get_api_baseurl():
     else:
         return location.origin
 
-
-def as_js_object(dict_):
-    obj = Object.create(None)
-    for k, v in dict_.items():
-        obj[k] = v
-    return obj
-
-
-msgpack = require("msgpack-lite")
 
 url = get_api_baseurl() + "/api/socket"
 url = url.replace("http://", "ws://").replace("https://", "wss://")
@@ -77,25 +89,36 @@ def send_request(request):
             active_socket.onmessage = wsreceive
             active_socket.onerror = wserror
     else:
-        active_socket.send(msgpack.encode(request))
+        p = msgpack.encode(request)
+        console.log("send request", request, p.length)
+        active_socket.send(p)
+        # active_socket.send(msgpack.encode(request))
 
 
 def wsopen(event):
     global waiting_requests
     if waiting_requests:
+        console.log("open socket", waiting_requests)
         for r in waiting_requests:
             active_socket.send(msgpack.encode(r))
         waiting_requests = None
 
 
 def wsreceive(event):
-    postMessage(decode(event.data))
+    feed(event.data)
 
 
 def wserror(event):
-    postMessage(as_js_object({
+    global active_socket
+    console.warn("got websocket error", event, active_socket)
+    # __pragma__("jsiter")
+    postMessage({
         "action": "error",
-        "error": as_js_object({
-            "closed": active_socket.readyState == 3
-        })
-    }))
+        "error": {
+            "msg": "socket closed",
+            "state": active_socket.readyState == 3
+        }
+    })
+    # __pragma__("nojsiter")
+    active_socket.close()
+    active_socket = None

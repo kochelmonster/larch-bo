@@ -2,7 +2,7 @@ import os
 import logging
 from time import time
 from tempfile import NamedTemporaryFile
-from gevent import spawn, sleep
+from gevent import spawn, sleep, GreenletExit
 
 
 logger = logging.getLogger("larch.bo.server.file")
@@ -29,12 +29,13 @@ class UploadFile:
         except AttributeError:
             self.tmpfile = tmpfile = NamedTemporaryFile(delete=False)
 
-        tmpfile.write(chunk)
+        self.last_active = time()
         self.loaded += len(chunk)
+        tmpfile.write(chunk)
         if self.loaded >= self.file_info["size"]:
             tmpfile.close()
-
-        self.last_active = time()
+            return True
+        return False
 
     def unlink(self):
         try:
@@ -72,28 +73,21 @@ class FileUploader:
     def file_accept_uploads(self, destination, files, accept):
         return {f["id"]: True for f in files}
 
-    def file_upload_chunk(self, id_, chunk):
-        logger.debug("file_upload_chunk %r %r", id_, len(chunk))
-        state = "continue"
+    def file_upload(self, queue, id_):
         try:
+            logger.debug("file_upload %r", id_)
             file_ = self.file_uploads[id_]
-            if file_.add(chunk):
-                state = "finished"
-                self.file_done_upload(file_)
-        except Exception:
-            logger.exception("Error uploading chunk %r", id_)
-            state = "error"
-
-        return {"id": id_, "state": state}
-
-    def file_upload_abort(self, id_):
-        logger.debug("file_upload_abort %r", id_)
-        try:
+            for chunk in queue:
+                if file_.add(chunk):
+                    self.file_done_upload(file_)
+                    yield len(chunk)
+                    break
+                else:
+                    yield len(chunk)
+        except GreenletExit:
             file_ = self.file_uploads.pop(id_)
             file_.unlink()
             logger.debug("aborted upload %r", id_)
-        except KeyError:
-            pass
 
     def _file_upload_monitor(self):
         try:
@@ -108,3 +102,7 @@ class FileUploader:
                         self.file_uploads.pop(fitem.id, None)
         finally:
             self._file_upload_monitor_greenlet = None
+
+    def file_done_upload(self, file_):
+        logger.warning("Implement file_done_upload %r", file_)
+        file_.unlink()
