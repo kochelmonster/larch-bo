@@ -27,12 +27,17 @@ if __name__ == "__main__":
 # __pragma__ ("noskip")
 
 
+class Translation:
+    def __init__(self, val):
+        self.val = val
+
+    def __str__(self):
+        return "translated:" + self.val
+
+
 def main():
-    b = LayoutBuilder()
-    row1 = b.columns("[test]", "label", "<1>")
-    row2 = b.columns("a", "b", "<1>")
-    console.log(row1.join())
-    console.log(row2.join())
+    t = Translation("test")
+    console.log(str(t))
 
 
 start_main(main)

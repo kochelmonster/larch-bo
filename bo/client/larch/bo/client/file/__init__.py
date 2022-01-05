@@ -1,6 +1,8 @@
 """file transfer functions"""
+from time import time
 from larch.reactive import Reactive, Cell
 from ..browser import BODY, executer, create_promise, loading_modules
+from ..i18n import pgettext
 
 # __pragma__("skip")
 
@@ -25,17 +27,20 @@ CHUNK_SIZE = 32*1024
 
 class FileItem(Reactive):
     sent_bytes = Cell(0)
+    status = Cell("active")
+    error = Cell("")
+    hidden = False
 
     def __init__(self, ofile, uploader):
+        self.start = 0
         self.ofile = ofile
         self.uploader = uploader
-        self.aborted = False
         self.id = uuidv4()
         self.request = None
         self.uploaded_bytes = 0
 
     def __repr__(self):
-        return f"<{self.__class__.__name__} {self.ofile.name}, {self.size}>"
+        return f"<{self.__class__.__name__} {self.ofile.name}, {self.size} {self.status}>"
 
     @property
     def name_(self):
@@ -45,19 +50,18 @@ class FileItem(Reactive):
     def size(self):
         return self.ofile.size
 
-    @property
-    def completed(self):
-        return self.sent_bytes >= self.size
-
     def pipe(self, file_reader):
-        if self.uploaded_bytes <= self.sent_bytes:
-            blob = self.ofile.slice(self.sent_bytes, min(self.sent_bytes+CHUNK_SIZE, self.size))
+        if self.status == "active" and self.uploaded_bytes <= self.sent_bytes:
+            blob = self.ofile.slice(
+                self.uploaded_bytes, min(self.uploaded_bytes+CHUNK_SIZE, self.size))
             file_reader.readAsArrayBuffer(blob)
             return True
         return False
 
     def upload(self, event):
-        if not self.completed:
+        if self.status == "active":
+            if self.uploaded_bytes == 0:
+                self.start = time()
             self.uploaded_bytes += event.target.result.byteLength
             if self.request is None:
                 self.request = window.transmitter.put_start(
@@ -67,12 +71,18 @@ class FileItem(Reactive):
             else:
                 self.request.put(event.target.result)
 
-    def abort(self):
-        self.aborted = True
-        if self.request is not None:
-            self.request.abort()
-            self.request = None
-        self.uploader.remove(self.id)
+    def abort(self, status="aborted", msg=None):
+        console.log("**abort", repr(self))
+        if self.status == "active":
+            if msg is None:
+                self.error = str(pgettext("file", "Aborted"))
+            else:
+                self.error = str(msg)
+            self.status = status
+            if self.request is not None:
+                self.request.abort()
+                self.request = None
+            self.uploader.update_active_count()
 
     def pack(self):
         f = self.ofile
@@ -88,17 +98,20 @@ class FileItem(Reactive):
 
     def _commited_upload(self, bytes_done):
         self.sent_bytes += bytes_done
+        if self.sent_bytes >= self.size:
+            self.status = "completed"
+            self.uploader.update_active_count()
 
     def _check_upload_state(self, state):
         pass
 
     def _error_upload(self, state):
         console.warn("error uploading", state)
-        self.abort()
+        self.abort("error", pgettext("file", "An error occured"))
 
 
 class FileUploader(Reactive):
-    active_count = Cell()
+    active_count = Cell(1)
     _start_callback = None
 
     def __init__(self, accept="", mode="", destination="default"):
@@ -137,12 +150,6 @@ class FileUploader(Reactive):
             self.file_reader = None
         for f in list(self.files):
             f.abort()
-        self.active_count = 0
-
-    def remove(self, id_):
-        self.files = [f for f in self.files if f.id != id_]
-        self.active_count = len(self.files)
-        self.active_index = min(self.active_index, self.active_count-1)
 
     def _upload_chunk(self, event):
         active = self.files[self.active_index]
@@ -153,38 +160,41 @@ class FileUploader(Reactive):
     def _error(self, event):
         active = self.files[self.active_index]
         if active is not None:
-            active.abort()
+            console.warn("error reading file", repr(active), event)
+            active.abort("error", pgettext("file", "An error occured"))
         self.upload_next()
+
+    def update_active_count(self):
+        self.active_count = len([f for f in self.files if f.status == "active"])
 
     def start_upload(self, files):
         self.files = [FileItem(f, self) for f in files]
         self.file_reader = __new__(FileReader())
         self.file_reader.onload = self._upload_chunk
         self.file_reader.onerror = self._error
-
         window.session.extern.file_upload_start(
             self.destination, [f.pack() for f in self.files], self.accept).then(
                 self._accept, self.abort)
 
     def upload_next(self):
+        active_count = 0
         for i in range(len(self.files)):
             self.active_index += 1
             if self.active_index >= len(self.files):
                 self.active_index = 0
 
             active = self.files[self.active_index]
-            if active.completed:
-                self.remove(active.id)
-            else:
-                if active.pipe(self.file_reader):
-                    return
+            if active.status == "active":
+                active_count += 1
 
-        if len(self.files):
+            if active.pipe(self.file_reader):
+                return
+
+        if active_count:
             window.setTimeout(self.upload_next, 100)
 
     def _accept(self, ids):
         self.files = [f for f in self.files if f.id in ids]
-        self.active_count = len(self.files)
         self.upload_next()
         if self._start_callback is not None:
             self._start_callback(self)

@@ -1,6 +1,6 @@
 from larch.reactive import rule, Cell
-from larch.bo.client.control import Control, register as cregister
-from larch.bo.client.browser import loading_modules, LiveTracker
+from ..client.control import Control, register as cregister
+from ..client.browser import loading_modules, LiveTracker
 
 # __pragma__("skip")
 from larch.bo.packer import parcel

@@ -3,7 +3,7 @@ from larch.reactive import Cell, rule
 from larch.bo.client.vaadin import vinput, vbutton, vdialog
 from larch.bo.client.grid import Grid
 from larch.bo.client.grid.snippets import OkCancel
-from larch.bo.client.i18n import label
+from larch.bo.client.command import label
 from larch.bo.client.control import ControlContext
 from larch.bo.client.session import Session
 from larch.bo.client.browser import start_main
@@ -33,6 +33,9 @@ if __name__ == "__main__":
 
 vbutton.register()
 vinput.register()
+
+
+clas
 
 
 class Hello(Grid):
@@ -65,11 +68,11 @@ class Hello(Grid):
     def ok(self):
         print("ok", self.parent)
         self.result = True
-        self.context["dialog"].close()  # __:opov
+        self.context.get("dialog").close()
 
     def cancel(self):
         print("cancel", self.parent)
-        self.context["dialog"].close()  # __:opov
+        self.context.get("dialog").close()
 
     @rule
     def _rule_make_msg(self):

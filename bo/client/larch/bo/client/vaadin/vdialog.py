@@ -1,5 +1,5 @@
-from larch.bo.client.control import RenderingContext
-from larch.bo.client.browser import loading_modules, BODY
+from ..control import RenderingContext
+from ..browser import loading_modules, BODY
 
 # __pragma__("skip")
 from larch.bo.packer import parcel

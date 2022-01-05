@@ -1,5 +1,6 @@
 import re
 from larch.reactive import rule, Pointer, Cell
+from ..i18n import pgettext as translate
 from ..textlayout import DOMCell, Empty, AlignedCell, Parser, Stretcher, RowSpan, walk_pointer
 from ..control import Control, RenderingContext
 
@@ -45,11 +46,11 @@ class Label(AlignedCell):
     def create(self):
         return {}
 
-    def render(self, grid):
+    def render(self, grid, grid_element):
         grid.contexts[self.name]["element"] = el = document.createElement("label")
-        el.innerHTML = self.text
+        el.innerHTML = str(translate(self.text))
         self.set_css_style(el.style)
-        grid.element.appendChild(el)
+        grid_element.appendChild(el)
 
 
 class Field(AlignedCell):
@@ -90,10 +91,10 @@ class Field(AlignedCell):
         pointer = walk_pointer(pointer, self.path)
         return FieldContext(pointer, grid.context, self)
 
-    def render(self, grid):
+    def render(self, grid, grid_element):
         el = document.createElement("div")
         self.set_css_style(el.style)
-        grid.element.appendChild(el)
+        grid_element.appendChild(el)
         grid.contexts[self.name].container = el
 
 
@@ -114,12 +115,12 @@ class Spacer(DOMCell):
     def create(self):
         return
 
-    def render(self, grid):
+    def render(self, grid, grid_element):
         el = document.createElement("div")
         el.style.width = self.width
         el.style.height = self.height
         self.set_css_style(el.style)
-        grid.element.appendChild(el)
+        grid_element.appendChild(el)
 
 
 class Grid(Control):
@@ -137,6 +138,7 @@ class Grid(Control):
     """
 
     layout_cache = {}
+    scrollable = False
     fields = []
     element = None
 
@@ -190,10 +192,18 @@ class Grid(Control):
         if not self.context["id"]:
             self.context["id"] = self.__class__.__name__
         self.context.control = self
-        self.element = el = document.createElement("div")
+        el = document.createElement("div")
         el.classList.add("lbo-grid")
-        parent.appendChild(self.element)
-        self.render_to_dom()
+
+        if self.scrollable:
+            parent.classList.add("scroll-container")
+            parent.classList.add(self.__class__.__name__ + "Container")
+
+        parent.appendChild(el)
+        self.render_to_dom(el)
+        # when self.element is set, all contexts are initialized
+        self.element = el
+        self.modify_controls()  # may want to have self.element
 
     def iter_fields_controls(self):
         for f in self.fields:
@@ -204,6 +214,8 @@ class Grid(Control):
     def unlink(self):
         super().unlink()
         self.unlink_children()
+        self.element.parentElement.classList.remove("scroll-container")
+        self.element.parentElement.classList.remove(self.__class__.__name__)
         self.element = None
 
     def unlink_children(self):
@@ -211,10 +223,9 @@ class Grid(Control):
             ctrl.context.container = None
             ctrl.unlink()
 
-    def render_to_dom(self):
+    def render_to_dom(self, element):
         self.unlink_children()
         self._make_cells()
-        element = self.element
         element.innerHTML = ""
         element.style["grid-template-columns"] = " ".join(
             [f"{c}fr" if c else "auto" for c in self.column_stretchers])
@@ -227,9 +238,7 @@ class Grid(Control):
             element.style.height = ""
 
         for name, c in self.cells.items():
-            c.render(self)
-
-        self.modify_controls()
+            c.render(self, element)
 
     def prepare_contexts(self):
         pass
@@ -245,6 +254,10 @@ class Grid(Control):
         """short for self.contexts[name].control"""
         return self.contexts[name].control
 
+    def container(self, name):
+        """short for self.contexts[name].container"""
+        return self.contexts[name].container
+
     def get_tab_elements(self):
         elements = []
         for ctrl in self.iter_fields_controls():
@@ -257,7 +270,8 @@ class Grid(Control):
             self.layout
             yield
             if self.element:
-                self.render_to_dom()
+                self.render_to_dom(self.element)
+                self.modify_controls()
 
 
 def move(operation, lc, lr):

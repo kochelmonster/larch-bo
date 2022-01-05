@@ -67,7 +67,7 @@ class Hello(Grid):
 
 def main():
     frame = Frame()
-    frame.context["session"] = Session()  # __: opov
+    frame.context.set("session", Session())
     window.session.set_root(frame)
     window.grid = frame.content
 

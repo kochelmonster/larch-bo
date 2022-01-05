@@ -1,12 +1,13 @@
-from larch.reactive import Reactive, Cell, Pointer, rule
-from larch.bo.client.vaadin import vbutton, vdialog, vprogress
+from time import time
+from larch.reactive import Reactive, rule, Cell
+from larch.bo.client.vaadin import vbutton, vdialog, vprogress, styles
 from larch.bo.client.grid import Grid
-from larch.bo.client.i18n import gettext as _, label
+from larch.bo.client.i18n import gettext as _
+from larch.bo.client.command import label
 from larch.bo.client.control import ControlContext, register
 from larch.bo.client.session import Session
 from larch.bo.client.browser import start_main, BODY
 from larch.bo.client.file import FileUploader, gui, FileItem
-from operator import itemgetter
 
 
 # __pragma__("skip")
@@ -18,11 +19,13 @@ from larch.bo.api.file import FileUploader as APIFileUploader
 from larch.bo.server import run
 from pathlib import Path
 
+gui
+styles
 location = window = document = console = None
 logger = getLogger("main")
 def require(path): pass
 def __pragma__(*args): pass
-gui
+
 
 if __name__ == "__main__":
     config_logging("out.log", __file__)
@@ -64,16 +67,17 @@ class SimulatedUploader(Reactive):
 
     def __init__(self):
         self.files = [FileItem(f, self) for f in FILES]
-        self.files[1].sent_bytes = 10000
-        self.active_count = len(self.files)
-        p = Pointer(self).files[0]  # __:opov
-        r = p.__call__()
-        console.log("p", repr(r), repr(self.files[0]), repr(itemgetter(0)(self.files)))
+        self.files[1].start = time()-1
+        self.files[1].sent_bytes = 30000
+        self.files[3].status = "aborted"
+        self.files[3].error = "Aborted"
 
-    def remove(self, id_):
-        self.files = [f for f in self.files if f.id != id_]
-        self.active_count = len(self.files)
-        self.active_index = min(self.active_index, self.active_count-1)
+        self.files[4].sent_bytes = self.files[4].size
+        self.files[4].status = "completed"
+        self.active_count = len(self.files) - 2
+
+    def update_active_count(self):
+        self.active_count = len([f for f in self.files if f.status == "active"])
 
     def abort(self):
         self.files = []
@@ -94,17 +98,18 @@ class UploadDialog(Grid):
 [.abort_all]{c}
 <1>
 """
+    element = Cell()
 
     @label(_("Abort All"))
     def abort_all(self):
-        console.log("Abort all")
+        self.context.get("dialog").close()
         self.context.value.abort()
 
     @rule
-    def _rule_close_when_finished(self):
-        console.log("_rule_close_when_finished", self.context.value.active_count)
-        if not self.context.value.active_count:
-            self.context["dialog"].close()  # __:opov
+    def _rule_change_label(self):
+        if self.element and not self.context.value.active_count:
+            if self.context.get("dialog").element.opened:
+                self.contexts["abort_all"].set("label", "Close").control.update()
 
 
 class Actions(Grid):
@@ -117,6 +122,10 @@ class Actions(Grid):
 """
 
     msg = "<h1>Choose an Action</h1>"
+
+    def prepare_contexts(self):
+        console.log("prepare context")
+        self.contexts["dialog"].set("prefix", "error")
 
     def open_window(self):
         window.open(location.href, "_blank", "width=200,height=400,modal=yes")
@@ -148,7 +157,7 @@ class Actions(Grid):
 def main():
     frame = Actions(ControlContext(session=Session(BODY)))
     window.session.set_root(frame)
-    window.grid = frame.content
+    window.grid = frame
 
 
 start_main(main)

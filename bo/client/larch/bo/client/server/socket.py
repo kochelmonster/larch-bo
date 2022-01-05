@@ -47,7 +47,7 @@ function feed(data) {
 
 
 def obj_receive(obj):
-    console.log("receive obj", obj)
+    # console.log("receive obj", obj)
     postMessage(obj)
 
 
@@ -90,7 +90,7 @@ def send_request(request):
             active_socket.onerror = wserror
     else:
         p = msgpack.encode(request)
-        console.log("send request", request, p.length)
+        # console.log("send request", request, p.length)
         active_socket.send(p)
         # active_socket.send(msgpack.encode(request))
 
@@ -98,7 +98,7 @@ def send_request(request):
 def wsopen(event):
     global waiting_requests
     if waiting_requests:
-        console.log("open socket", waiting_requests)
+        # console.log("open socket", waiting_requests)
         for r in waiting_requests:
             active_socket.send(msgpack.encode(r))
         waiting_requests = None
@@ -110,7 +110,7 @@ def wsreceive(event):
 
 def wserror(event):
     global active_socket
-    console.warn("got websocket error", event, active_socket)
+    # console.warn("got websocket error", event, active_socket)
     # __pragma__("jsiter")
     postMessage({
         "action": "error",

@@ -84,7 +84,7 @@ lvalue:Value{r}|[.value]{l}
     output = Cell("")
 
     def prepare_contexts(self):
-        self.contexts["value"]["no_label_float"] = True   # __: opov
+        self.contexts["value"].set("no_label_float", True)
 
     def modify_controls(self):
         self.show("abort", False)
@@ -119,7 +119,7 @@ lvalue:Value{r}|[.value]{l}
 
         self.show("from_server", False)
         self.show("abort")
-        session = self.context["session"]  # __: opov
+        session = self.context.get("session")
         self.request = session.extern.get_data(10).receive(receive).then(result, error)
 
     def abort(self):
@@ -168,7 +168,7 @@ def main():
 
     frame = Frame()
     print("--build frame")
-    frame.context["session"] = Session(root_container)  # __: opov
+    frame.context.set("session", Session(root_container))
     print("--set session")
     window.session.set_root(frame)
     window.grid = frame.content

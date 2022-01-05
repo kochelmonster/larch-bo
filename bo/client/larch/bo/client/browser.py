@@ -1,8 +1,9 @@
 from collections import deque
 from larch.reactive import Reactive, Cell, rule
 # __pragma__("skip")
-document = window = Object = None
+document = window = Object = Option = None
 def __pragma__(*args): pass
+def __new__(p): pass
 # __pragma__("noskip")
 
 
@@ -112,3 +113,38 @@ def get_bubble_attribute(element, attribute, default):
             return element[attribute]
         element = element.parentElement
     return default
+
+
+icons = {}
+
+
+def register_icon(name, icon):
+    icons[name] = icon
+
+
+def get_icon(name):
+    return icons.get(name, name)
+
+
+def element_from_html(html):
+    tmp = document.createElement("div")
+    tmp.innerHTML = html
+    return tmp.firstChild
+
+
+def remove_slot(element, slot_name):
+    part = element.querySelector(f"[slot={slot_name}]")
+    if part:
+        part.remove()
+
+
+def add_slot(element, slot_name, slot_obj):
+    if isinstance(slot_obj, str):
+        slot_obj = element_from_html(slot_obj)
+    if slot_name:
+        slot_obj.slot = slot_name
+    element.appendChild(slot_obj)
+
+
+def escape(text):
+    return __new__(Option(text)).innerHTML

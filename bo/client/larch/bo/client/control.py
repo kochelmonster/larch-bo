@@ -17,8 +17,8 @@ def create_control_factory(context):
         return value
 
     if value is not None:
-        style = context["style"]  # __: opov
-        control_factory = adapter.get(type(value), Control, style or "")
+        style = context.get("style") or ""
+        control_factory = adapter.get(type(value), Control, style)
         if control_factory:
             control = control_factory(context)
             __pragma__("ifdef", "verbose2")
@@ -149,7 +149,6 @@ class ControlContext(Reactive):
 
     @value.setter
     def value(self, val):
-        console.log("set value", repr(val))
         if isinstance(self._value, Pointer):
             self._value.__call__(val)
         else:
@@ -163,34 +162,46 @@ class ControlContext(Reactive):
         return Pointer(v)
 
     def update_tabindex(self):
-        session = self["session"]  # __: opov
+        session = self.get("session")
         if session is not None:
             session.update_tabindex()
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.options}>"
 
-    def __getitem__(self, name):
+    def observe(self, name):
         value = self.options.get(name)
-        if value:
+        if value is not None:
             if isinstance(value, Container):
                 return value.get_value()
-
-            if rcontext.inside_rule:
-                # transform to container
-                self.options[name] = container = Container(value)
-                return container.get_value()
         elif self.parent is not None:
-            return self.parent[name]  # __: opov
+            value = self.parent.observe(name)
+            if value is not None:
+                return value
+
+        if rcontext.inside_rule:
+            # transform to container
+            self.options[name] = container = Container(value)
+            return container.get_value()
 
         return value
 
-    def __setitem__(self, name, value):
+    def get(self, name):
+        value = self.options.get(name)
+        if value is None and self.parent is not None:
+            return self.parent.get(name)
+
+        if isinstance(value, Container):
+            return value.get_value()
+        return value
+
+    def set(self, name, value):
         val = self.options.get(name)
         if isinstance(val, Container):
             val.set_value(value)
         else:
             self.options[name] = value
+        return self
 
 
 class RenderingContext(ControlContext):
@@ -205,7 +216,7 @@ class RenderingContext(ControlContext):
 
     def control_key(self):
         t = type(self.value)
-        style = self['style'] or ""  # __: opov
+        style = self.observe('style') or ""
         return f"{t.__name__}:{t.__module__}-{style}" if t else None
 
     def render_to_container(self):

@@ -115,7 +115,6 @@ class Transmitter:
                 request._resolve(to_object(obj["result"]))
         elif obj["action"] == "item":
             request = self.active_requests.get(obj["id"], None)
-            console.log("***received item", obj)
             if request:
                 request._receive(to_object(obj["item"]))
         elif obj["action"] == "error":

@@ -1,0 +1,45 @@
+.lbo-fileitem {
+  h3 {
+    margin: 0;
+  }
+
+  &.error {
+    color: var(--lbo-error-text-color);
+    .part-status {
+      color: var(--lbo-error-text-color);
+    }
+  }
+
+  > div {
+    text-overflow: ellipsis;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .part-error {
+    font-size: var(--lbo-font-size-s);
+  }
+
+  .part-status {
+    color: var(--lbo-primary-text-color);
+  }
+
+  .part-detail {
+    font-size: var(--lbo-font-size-s);
+    color: var(--lbo-secondary-text-color);
+  }
+}
+
+.lbo-fileuploader {
+  > div {
+    border-bottom: 1px solid var(--lbo-contrast-20pct);
+  }
+  > div:last-child {
+    border-bottom: none;
+  }
+}
+
+
+.scroll-container.FileUploaderControlContainer {
+  max-height: 80vh;
+}

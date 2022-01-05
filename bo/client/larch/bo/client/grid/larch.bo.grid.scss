@@ -1,20 +1,33 @@
 .lbo-grid {
   display: grid;
-  gap: 2pt 2pt;
-
+  justify-content: start;
+  align-content: start;
   label {
     align-self: center;
   }
 
-  color: var(--lumo-body-text-color);
-  font-size: var(--lumo-font-size-m);
-  font-family: var(--lumo-font-family);
-  border-radius: var(--lumo-border-radius-m);
-  justify-content: start;
-  align-content: start;
+  border-radius: var(--lbo-border-radius);
+  > div {
+    padding: var(--lbo-space-xs);
+  }
+}
+
+.scroll-container {
+  overflow: auto;
 }
 
 html, body {
   height: 100%;
   margin: 0;
+}
+
+html {
+  font-size: var(--lumo-font-size-m);
+  font-family: var(--lumo-font-family);
+  color: var(--lumo-body-text-color);
+  background: var(--lbo-base-color);
+}
+
+h3 {
+  font-size: var(--lbo-font-size-m);
 }

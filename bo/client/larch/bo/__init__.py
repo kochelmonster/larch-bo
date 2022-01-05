@@ -20,7 +20,7 @@ grid:
 - CommandHandler
  - minibuffer
  - key sequences
- - i18n.label, i18n.icon, i18n.tooltip
+ - @i18n.label, @i18n.icon, @i18n.tooltip
  - @command(alias?)
  - @key_sequence(string or {platform: "string"})
 

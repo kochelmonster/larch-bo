@@ -1,9 +1,6 @@
-from ..i18n import label
+from ..i18n import pgettext
+from ..command import label
 from . import Grid
-
-
-# just for msggettxt
-def pgettext(context, n): return n
 
 
 class OkCancel(Grid):

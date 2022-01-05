@@ -1,0 +1,17 @@
+html {
+  --lbo-font-size-m: var(--lumo-font-size-m);
+  --lbo-font-size-s: var(--lumo-font-size-s);
+
+  --lbo-font-family: var(--lumo-font-family);
+  --lbo-body-text-color: var(--lumo-body-text-color);
+  --lbo-base-color: var(--lumo-base-color);
+
+  --lbo-primary-text-color: var(--lumo-primary-text-color);
+  --lbo-secondary-text-color: var(--lumo-secondary-text-color);
+
+  --lbo-border-radius: var(--lumo-border-radius-m);
+  --lbo-space-xs: var(--lumo-space-xs);
+  --lbo-error-text-color: var(--lumo-error-text-color);
+
+  --lbo-contrast-20pct: var(--lumo-contrast-20pct);
+}
