@@ -140,6 +140,7 @@ class ControlContext(Reactive):
         self.options = kwargs
     # __pragma__ ('nokwargs')
 
+    # __pragma__ ('jscall')
     @property
     def value(self):
         v = self._value
@@ -161,13 +162,13 @@ class ControlContext(Reactive):
             return v
         return Pointer(v)
 
+    def __repr__(self):
+        return f"<{self.__class__.__name__} {self.options}>"
+
     def update_tabindex(self):
         session = self.get("session")
         if session is not None:
             session.update_tabindex()
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__} {self.options}>"
 
     def observe(self, name):
         value = self.options.get(name)
@@ -202,6 +203,7 @@ class ControlContext(Reactive):
         else:
             self.options[name] = value
         return self
+    # __pragma__ ('nojscall')
 
 
 class RenderingContext(ControlContext):

@@ -2,6 +2,7 @@
   display: grid;
   justify-content: start;
   align-content: start;
+  overflow: hidden;
   label {
     align-self: center;
   }
@@ -9,12 +10,10 @@
   border-radius: var(--lbo-border-radius);
   > div {
     padding: var(--lbo-space-xs);
+    overflow: hidden;
   }
 }
 
-.scroll-container {
-  overflow: auto;
-}
 
 html, body {
   height: 100%;

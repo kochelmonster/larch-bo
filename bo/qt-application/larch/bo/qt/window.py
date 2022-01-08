@@ -119,6 +119,16 @@ class JSBridge(QObject):
     def reload(self):
         self.window.reload()
 
+    @Slot(str, str, str, result=list)
+    def choose_files(self, mode, suggest, mimes):
+        mode = {
+            "file": QWebEnginePage.FileSelectOpen,
+            "multi": QWebEnginePage.FileSelectOpenMultiple,
+            "folder": QWebEnginePage.FileSelectUploadFolder
+        }[mode]
+        print("choose files called")
+        return self.window.view.page().chooseFiles(mode, [suggest], [])
+
 
 class WindowDragging:
     drag_pos = drag_width = None
@@ -311,6 +321,12 @@ class WebPage(QWebEnginePage):
             window.setWindowModality(Qt.ApplicationModal)
 
         request.openIn(window.view.page())
+
+    def chooseFiles(self, mode, old, mimes):
+        result = super().chooseFiles(mode, old, mimes)
+        print("chooseFiles", mode, old, mimes)
+        print("result", result)
+        return result
 
 
 class BrowserWindow(QMainWindow):

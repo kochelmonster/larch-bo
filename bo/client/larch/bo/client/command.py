@@ -41,7 +41,4 @@ def keys(prop):
 
 
 def get_func_prop(func, id_):
-    prop = func[id_]
-    if not prop and func.__org__:
-        return func.__org__[id_]
-    return prop
+    return func[id_]

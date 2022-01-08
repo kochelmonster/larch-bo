@@ -3,6 +3,10 @@ import re
 from larch.reactive import Pointer
 from bisect import bisect_left as bisect
 
+# __pragma__("skip")
+console = document = window = None
+# __pragma__("noskip")
+
 # __pragma__ ('ecom')
 
 
@@ -80,7 +84,7 @@ class Empty(Cell):
 
 
 class Stretcher(Cell):
-    EXPRESSION = re.compile(r"<(\d+)(M*)>")
+    EXPRESSION = re.compile(r"<(\d+)>")
 
     stretch = 0
     """stretch factor"""
@@ -95,7 +99,6 @@ class Stretcher(Cell):
     def create_cell(cls, mo):
         c = cls()
         c.stretch = float(mo.group(1))
-        c.moving = mo.group(2) == "M"
         return c
 
 
@@ -122,7 +125,7 @@ class AlignedCell(DOMCell):
 
     def __repr__(self):
         result = super().__repr__()
-        return result[:-1] + "{" + self.alignment + "}>"
+        return result[:-1] + "{" + self.alignment + "}>"  # __:opov
 
     def set_css_style(self, style):
         super().set_css_style(style)
@@ -235,7 +238,6 @@ class Parser:
         if row_stretchers:
             pos = Pointer().rows[0].__state__.delegate_get
             self.row_stretchers = self._build_stretcher(row_stretchers, self.row_count, pos)
-            self.row_splitters = self._build_splitter(row_stretchers, self.row_count, pos)
 
             # remove the stretcher columns
             self.column_count -= 1
@@ -252,7 +254,6 @@ class Parser:
         if col_stretchers:
             pos = Pointer().columns[0].__state__.delegate_get
             self.column_stretchers = self._build_stretcher(col_stretchers, self.column_count, pos)
-            self.column_splitters = self._build_splitter(col_stretchers, self.column_count, pos)
             return True
         else:
             self.column_stretchers = [0 for i in range(self.column_count)]
@@ -317,15 +318,6 @@ class Parser:
             result[pos(s)] = s.stretch
         return result
 
-    def _build_splitter(self, stretchers, size, pos):
-        """returns the moving edges, this must be two consecutive
-        moving stretchers. 1 means the edge between row 0 and row 1
-        """
-        canonic = [False for i in range(size)]
-        for s in stretchers:
-            canonic[pos(s)] = s.moving
-        return [i+1 for i, m in enumerate(canonic[:-1]) if m and canonic[i+1]]
-
 
 def walk_pointer(pointer, path):
     """returns a new sub pointer defined by path."""
@@ -361,13 +353,12 @@ class LayoutBuilder:
                         yield c.strip()
 
         if not cols:
-            result = patch_join(self, [[""] for i in range(len(self.sizes))])
+            result = patch_join(self, ["" for i in range(len(self.sizes))])
         else:
             result = patch_join(self, iter_cols())
 
-        if len(result) > len(self.sizes):
-            for i in range(len(result) - len(self.sizes)):
-                self.sizes.append([0])
+        for i in range(len(self.sizes), len(result)):
+            self.sizes.append(0)
 
         for i, c in enumerate(result):
             self.sizes[i] = max(len(c), self.sizes[i])
@@ -388,11 +379,9 @@ class LineList(list):
 def patch_join(builder, sequence):
     def join():
         def padd(string, size):
-            if len(string) < size:
-                return string + "".join([" " for i in range(size-len(string))])
-            return string
+            return string + "".join([" " for i in range(len(string), size)])
 
-        return "|".join(padd(c, s) for c, s in zip(result, builder.sizes))
+        return "|".join([padd(cell, s) for cell, s in zip(result, builder.sizes)])
 
     result = LineList(sequence)
     result.join = join

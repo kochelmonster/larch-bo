@@ -1,6 +1,7 @@
 # import larch.lib.adapter as adapter
 from larch.bo.client.browser import start_main
 from larch.bo.client.textlayout import LayoutBuilder
+from larch.bo.client.command import label
 
 # __pragma__("skip")
 # ---------------------------------------------------
@@ -27,17 +28,37 @@ if __name__ == "__main__":
 # __pragma__ ("noskip")
 
 
-class Translation:
-    def __init__(self, val):
-        self.val = val
 
-    def __str__(self):
-        return "translated:" + self.val
-
-
-def main():
-    t = Translation("test")
-    console.log(str(t))
+class ListHandler:
+    def __init__(self):
+        console.log("__init__ ListHandler")
+        super().__init__()
 
 
-start_main(main)
+class Control:
+    def __init__(self):
+        console.log("__init__ Control")
+        super().__init__()
+
+
+class Table(Control):
+    def __init__(self):
+        console.log("__init__ Table")
+        super().__init__()
+
+
+class FileView(ListHandler, Table):
+    def ___init__(self):
+        console.log("__init__ FileView")
+        super().__init__()
+
+
+f = FileView()
+
+
+class API:
+    def __getattr__(self, name):
+        return None
+
+
+api = API()

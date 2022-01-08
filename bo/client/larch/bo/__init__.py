@@ -8,10 +8,6 @@ todos:
    - file upload test
 
 grid:
-  - scoll mit overflow (in Dialog)
-  - splitter handling (min(min-content, px))
-     https://stackoverflow.com/questions/46931103/making-a-dragbar-to-resize-divs-inside-css-grids#46934825
-  - save state
   - css animation
 
 - gettext/i18n
@@ -25,5 +21,14 @@ grid:
  - @key_sequence(string or {platform: "string"})
 
 
+
+Heute
+
+- table parser
+- Grid / cache als dom template
+  Wie overflow: parent-grid -> max-heigt 100%  gridaray: overflow: auto
+
+- css-animationen im grid
+- fastcall  wenn möglich
 
 """

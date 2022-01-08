@@ -1,4 +1,4 @@
-from ..browser import loading_modules
+from ...browser import loading_modules
 
 # __pragma__("skip")
 from larch.bo.packer import parcel

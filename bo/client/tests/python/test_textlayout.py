@@ -2,9 +2,10 @@ import unittest
 import larch.reactive as ra
 import larch.bo.client.textlayout as tl
 import larch.bo.client.grid as grid
+import larch.bo.client.table as table
 
 
-class LayoutTest(unittest.TestCase):
+class GridLayoutTest(unittest.TestCase):
     def parse(self, layout):
         return grid.GridParser(layout)
 
@@ -93,24 +94,8 @@ col1    |
 """
         self.assertRaises(ValueError, self.parse, layout)
 
-    def test_splitter1(self):
-        p = self.parse("""
-[a] |[c]|<1M>
-[b] |[d]|<1>
-<1M>|<1M>
-""")
-        self.assertEqual(p.row_splitters, [])
-        self.assertEqual(p.column_splitters, [1])
 
-    def test_splitter2(self):
-        p = self.parse("""
-[a]|<1>
-[b]|<1M>
-[c]|<1M>
-[d]|<1M>
-""")
-        self.assertEqual(p.row_splitters, [2, 3])
-        self.assertEqual(p.column_splitters, [])
+BUILD_CMP = "                  |      |[.header['udn']]|[.header['created']]|[.header['level']]|[.header['path']]|[.header['line']]|[.header['message']]\n-----\n[.show_additional]|[.rid]|[udn]           |[created]           |[level]           |[path]           |[line]           |[message]           \n[.additional]\n                  |      |                |                    |                  |                 |                 |<1>                 "
 
 
 class BuildLayoutTest(unittest.TestCase):
@@ -125,19 +110,18 @@ class BuildLayoutTest(unittest.TestCase):
         index = columns.index("message") + 2
         stretchers = builder.columns()
         stretchers[index] = "<1>"
-        table = title.join() + "\n-----\n" + body.join()
-        table += "\n[.additional]"
-        table += "\n" + stretchers.join()
-
-        cmp_ = "                  |      |[.header['udn']]|[.header['created']]|[.header['level']]|[.header['path']]|[.header['line']]|[.header['message']]\n-----\n[.show_additional]|[.rid]|[udn]           |[created]           |[level]           |[path]           |[line]           |[message]           \n[.additional]\n                  |      |                |                    |                  |                 |                 |<1>                 "
-        self.assertEqual(cmp_, table)
+        table_ = title.join() + "\n-----\n" + body.join()
+        table_ += "\n[.additional]"
+        table_ += "\n" + stretchers.join()
+        self.maxDiff = None
+        self.assertEqual(BUILD_CMP, table_)
         self.assertEqual(len(builder), 8)
 
 
 class MiscTest(unittest.TestCase):
     def test_walk_pointer(self):
         proxy = tl.walk_pointer(ra.Pointer(), "path[0].index['col']")
-        cmp_ = "<Pointer-<class 'larch.reactive.pointer.NOTHING'>.path[0].index['col']>"
+        cmp_ = "<Pointer-<class 'larch.reactive.pointer.NOTHING'>.path[0].index[col]>"
         self.assertEqual(cmp_, repr(proxy))
 
     def test_cellparse_error(self):
@@ -145,6 +129,59 @@ class MiscTest(unittest.TestCase):
 
     def test_stretcher(self):
         self.assertFalse(tl.Stretcher())
+
+
+TLAYOUT1 = """
+fn:+First name{rm}|Last name|Email      |
+-----
+fb:+[first]{rm}   |[last]   |[email]    |[.show()]
+[detail]
+    <1>           |<1>      |           |
+"""
+
+TLAYOUT2 = """
+Name         |type  | size  |
+---
+[icon]|[name]|[type]|[size]|
+      |  "   |[.sec]|
+"""
+
+TLAYOUT3 = """
+------
+*|+name     |code |
+----
+ |[.count()]{r}   |
+"""
+
+TLAYOUT4 = """
+[[0]]
+"""
+
+
+class TableLayoutTest(unittest.TestCase):
+    def parse(self, layout):
+        return table.TableParser(layout)
+
+    def print_structure(self, parser):
+        print()
+        for section in ("header", "body", "footer"):
+            print("Section", section)
+            for row in getattr(parser, section):
+                print(row)
+            print()
+
+    def test_layout1(self):
+        parser = self.parse(TLAYOUT1)
+        self.print_structure(parser)
+
+    def test_layout2(self):
+        parser = self.parse(TLAYOUT2)
+        self.print_structure(parser)
+
+    def test_layout3(self):
+        parser = self.parse(TLAYOUT3)
+        self.print_structure(parser)
+
 
 
 if __name__ == "__main__":

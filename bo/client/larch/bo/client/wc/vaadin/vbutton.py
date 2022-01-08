@@ -1,6 +1,6 @@
-from ..control import Control, register as cregister
-from ..browser import loading_modules, get_icon, add_slot
-from ..command import get_func_prop
+from ...control import Control, register as cregister
+from ...browser import loading_modules, get_icon, add_slot
+from ...command import get_func_prop
 
 # __pragma__("skip")
 from larch.bo.packer import parcel

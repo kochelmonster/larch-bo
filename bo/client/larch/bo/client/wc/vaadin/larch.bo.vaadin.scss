@@ -1,4 +1,5 @@
 html {
+  --lbo-font-size-l: var(--lumo-font-size-l);   // header
   --lbo-font-size-m: var(--lumo-font-size-m);
   --lbo-font-size-s: var(--lumo-font-size-s);
 
@@ -13,5 +14,5 @@ html {
   --lbo-space-xs: var(--lumo-space-xs);
   --lbo-error-text-color: var(--lumo-error-text-color);
 
-  --lbo-contrast-20pct: var(--lumo-contrast-20pct);
+  --lbo-contrast-20pct: var(--lumo-contrast-20pct);  // border color
 }

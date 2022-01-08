@@ -1,6 +1,5 @@
 # import larch.lib.adapter as adapter
-from larch.bo.client.vaadin.vinput import register as input_register
-from larch.bo.client.vaadin.vbutton import register as button_register
+from larch.bo.client.wc.vaadin import vbutton, vinput
 from larch.bo.client.grid import Grid
 from larch.bo.client.session import Session
 from larch.bo.client.browser import BODY, start_main
@@ -50,8 +49,8 @@ if __name__ == "__main__":
 # __pragma__ ("noskip")
 
 require("./grid.scss")
-input_register()
-button_register()
+vinput.register()
+vbutton.register()
 
 
 class Frame(Grid):

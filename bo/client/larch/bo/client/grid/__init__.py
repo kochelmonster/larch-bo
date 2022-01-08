@@ -19,13 +19,14 @@ class FieldContext(RenderingContext):
     def __init__(self, value, parent, cell):
         super().__init__(value, parent)
         self.options["name"] = cell.name
+        self.options["autofocus"] = cell.autofocus
         self.options["id"] = self.parent["id"] + "." + cell.name
         if cell.style:
             self.options["style"] = cell.style
 
 
 class Label(AlignedCell):
-    EXPRESSION = re.compile(DOMCell.REGEXP + r"([^{}]+)" + AlignedCell.REGEXP, re.UNICODE)
+    EXPRESSION = re.compile(DOMCell.REGEXP + r"([^{}]+)" + AlignedCell.REGEXP)
     text = ""
     control = None
 
@@ -33,11 +34,10 @@ class Label(AlignedCell):
     def create_cell(cls, mo):
         tmp = cls()
         tmp.alignment = mo.group(4) or ""
-        tmp.text = mo.group(2)
-
         tmp.name = mo.group(1)
+        tmp.text = mo.group(2)
         if tmp.name:
-            tmp.name = tmp.name[:-1]
+            tmp.name = tmp.name[:-1]  # __:opov
         else:
             tmp.name = tmp.text
 
@@ -48,7 +48,7 @@ class Label(AlignedCell):
 
     def render(self, grid, grid_element):
         grid.contexts[self.name]["element"] = el = document.createElement("label")
-        el.innerHTML = str(translate(self.text))
+        el.innerHTML = str(translate("grid", self.text))
         self.set_css_style(el.style)
         grid_element.appendChild(el)
 
@@ -73,7 +73,7 @@ class Field(AlignedCell):
 
         tmp.name = mo.group(1)
         if tmp.name:
-            tmp.name = tmp.name[:-1]
+            tmp.name = tmp.name[:-1]   # __:opov
         else:
             tmp.name = tmp.path.split(".")[-1]  # __: opov
 
@@ -138,7 +138,6 @@ class Grid(Control):
     """
 
     layout_cache = {}
-    scrollable = False
     fields = []
     element = None
 
@@ -170,7 +169,7 @@ class Grid(Control):
             parsed.row_count = parser.row_count
             parsed.column_stretchers = parser.column_stretchers
             parsed.row_stretchers = parser.row_stretchers
-            self.__class__.layout_cache[self.layout] = parsed
+            self.layout_to_cache(self.layout, parsed)
 
         self.fields = parsed.fields
         self.cells = parsed.cells
@@ -188,16 +187,15 @@ class Grid(Control):
         self.prepare_contexts()
         return self.cells
 
+    def layout_to_cache(self, layout, parsed):
+        self.__class__.layout_cache[layout] = parsed
+
     def render(self, parent):
         if not self.context["id"]:
             self.context["id"] = self.__class__.__name__
         self.context.control = self
         el = document.createElement("div")
         el.classList.add("lbo-grid")
-
-        if self.scrollable:
-            parent.classList.add("scroll-container")
-            parent.classList.add(self.__class__.__name__ + "Container")
 
         parent.appendChild(el)
         self.render_to_dom(el)
@@ -214,8 +212,6 @@ class Grid(Control):
     def unlink(self):
         super().unlink()
         self.unlink_children()
-        self.element.parentElement.classList.remove("scroll-container")
-        self.element.parentElement.classList.remove(self.__class__.__name__)
         self.element = None
 
     def unlink_children(self):

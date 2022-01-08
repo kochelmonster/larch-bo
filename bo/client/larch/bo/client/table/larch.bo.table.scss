@@ -1,0 +1,41 @@
+.lbo-table {
+  max-height: 100%;
+  overflow: auto;
+  position: relative;
+  > div {
+    display: grid;
+    justify-content: start;
+    align-content: start;
+    grid-auto-rows: auto;
+    > div, > header {
+      padding: var(--lbo-space-xs);
+    }
+  }
+  .back {
+    border-radius: 0;
+  }
+
+  header, footer {
+    font-size: var(--lbo-font-size-l);
+  }
+
+  header.back {
+    background: var(--lbo-base-color);
+    border-bottom: 1px solid var(--lbo-contrast-20pct);
+  }
+
+  div.back {
+    border-bottom: 1px solid var(--lbo-contrast-20pct);
+  }
+
+  footer.back {
+    background: var(--lbo-base-color);
+    border-top: 1px solid var(--lbo-contrast-20pct);
+  }
+
+  label {
+    align-self: center;
+  }
+
+  border-radius: var(--lbo-border-radius);
+}

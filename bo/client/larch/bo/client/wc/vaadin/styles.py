@@ -1,4 +1,4 @@
-from ..browser import loading_modules, register_icon
+from ...browser import loading_modules, register_icon
 from . import icon
 
 # __pragma__("skip")

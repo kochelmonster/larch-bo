@@ -31,12 +31,14 @@ require("./larch.bo.file.scss")
 @register(FileUploader)
 @register(FileUploader, "content")
 class FileUploaderControl(Grid):
-    scrollable = True
     layout = Cell("")
 
     @property
     def files(self):
         return self.context.value.files
+
+    def layout_to_cache(self, layout, parsed):
+        pass  # do not put dynamic layouts to cache
 
     def render(self, parent):
         self.update_layout()
