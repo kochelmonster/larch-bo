@@ -1,7 +1,5 @@
-# import larch.lib.adapter as adapter
-from larch.bo.client.browser import start_main
-from larch.bo.client.textlayout import LayoutBuilder
-from larch.bo.client.command import label
+from larch.bo.client.control import ControlContext
+from larch.reactive import Reactive, rule, Cell
 
 # __pragma__("skip")
 # ---------------------------------------------------
@@ -28,37 +26,26 @@ if __name__ == "__main__":
 # __pragma__ ("noskip")
 
 
+class Table(Reactive):
+    value = Cell()
 
-class ListHandler:
-    def __init__(self):
-        console.log("__init__ ListHandler")
-        super().__init__()
+    def __init__(self, context):
+        self.context = context
 
+    @rule
+    def _rule_set(self):
+        console.log("set context", self.value)
+        self.context.set("test", self.value)
 
-class Control:
-    def __init__(self):
-        console.log("__init__ Control")
-        super().__init__()
-
-
-class Table(Control):
-    def __init__(self):
-        console.log("__init__ Table")
-        super().__init__()
+    @rule
+    def _rule_observe(self):
+        console.log("observe", self.context.observe("test"))
 
 
-class FileView(ListHandler, Table):
-    def ___init__(self):
-        console.log("__init__ FileView")
-        super().__init__()
+context = ControlContext()
+table = Table(context)
 
-
-f = FileView()
-
-
-class API:
-    def __getattr__(self, name):
-        return None
-
-
-api = API()
+context.set("test", 1)
+context.set("test", 2)
+window.context = context
+window.table = table

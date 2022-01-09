@@ -20,7 +20,7 @@ class FieldContext(RenderingContext):
         super().__init__(value, parent)
         self.options["name"] = cell.name
         self.options["autofocus"] = cell.autofocus
-        self.options["id"] = self.parent["id"] + "." + cell.name
+        self.options["id"] = self.parent.get("id") + "." + cell.name
         if cell.style:
             self.options["style"] = cell.style
 
@@ -43,14 +43,20 @@ class Label(AlignedCell):
 
         return tmp
 
-    def create(self):
+    def create_template(self, parent):
+        el = document.createElement("label")
+        self.set_css_style(el.style)
+        parent.appendChild(el)
+
+    def create_context(self):
         return {}
 
-    def render(self, grid, grid_element):
-        grid.contexts[self.name]["element"] = el = document.createElement("label")
-        el.innerHTML = str(translate("grid", self.text))
-        self.set_css_style(el.style)
-        grid_element.appendChild(el)
+    def render(self, grid, element):
+        grid.contexts[self.name]["element"] = element
+        element.innerHTML = str(translate("grid", self.text))
+        context = grid.contexts[self.field]
+        if context:
+            context.set("label-element", element)
 
 
 class Field(AlignedCell):
@@ -86,16 +92,18 @@ class Field(AlignedCell):
         tmp.autofocus = bool(mo.group(13))
         return tmp
 
-    def create(self, grid):
+    def create_template(self, parent):
+        el = document.createElement("div")
+        self.set_css_style(el.style)
+        parent.appendChild(el)
+
+    def create_context(self, grid):
         pointer = Pointer(grid) if self.path.startswith(".") else grid.context.value_pointer
         pointer = walk_pointer(pointer, self.path)
         return FieldContext(pointer, grid.context, self)
 
-    def render(self, grid, grid_element):
-        el = document.createElement("div")
-        self.set_css_style(el.style)
-        grid_element.appendChild(el)
-        grid.contexts[self.name].container = el
+    def render(self, grid, element):
+        grid.contexts[self.name].container = element
 
 
 class Spacer(DOMCell):
@@ -112,15 +120,18 @@ class Spacer(DOMCell):
         tmp.height = h
         return tmp
 
-    def create(self):
-        return
-
-    def render(self, grid, grid_element):
+    def create_template(self, parent):
         el = document.createElement("div")
         el.style.width = self.width
         el.style.height = self.height
         self.set_css_style(el.style)
-        grid_element.appendChild(el)
+        parent.appendChild(el)
+
+    def create_context(self):
+        return
+
+    def render(self, grid, grid_element):
+        pass
 
 
 class Grid(Control):
@@ -139,7 +150,7 @@ class Grid(Control):
 
     layout_cache = {}
     fields = []
-    element = None
+    element = Cell()
 
     @property
     def parent(self):
@@ -147,7 +158,7 @@ class Grid(Control):
         if self.context and self.context.parent:
             return self.context.parent.control
 
-    def _make_cells(self):
+    def initialize(self):
         parsed = self.__class__.layout_cache.get(self.layout)
         if parsed is None:
             tindex = 1000
@@ -165,42 +176,48 @@ class Grid(Control):
                         parsed.fields.append(c)
 
             parsed.fields.sort(lambda c: int(c.tabindex))
-            parsed.column_count = parser.column_count
-            parsed.row_count = parser.row_count
-            parsed.column_stretchers = parser.column_stretchers
-            parsed.row_stretchers = parser.row_stretchers
+
+            parsed.template = el = document.createElement("div")
+            el.classList.add("lbo-grid")
+            el.style["grid-template-columns"] = " ".join(
+                [f"{c}fr" if c else "auto" for c in parser.column_stretchers])
+            el.style["grid-template-rows"] = " ".join(
+                [f"{c}fr" if c else "auto" for c in parser.row_stretchers])
+
+            if sum(parser.row_stretchers):
+                el.style.height = "100%"
+
+            parsed.cells_list = list(parsed.cells.values())
+            for c in parsed.cells_list:
+                c.create_template(el)
+
             self.layout_to_cache(self.layout, parsed)
 
         self.fields = parsed.fields
         self.cells = parsed.cells
-        self.column_count = parsed.column_count
-        self.row_count = parsed.row_count
-        self.column_stretchers = parsed.column_stretchers
-        self.row_stretchers = parsed.row_stretchers
+        self.cells_list = parsed.cells_list
 
         self.contexts = {}
         for name, c in self.cells.items():
-            ctx = c.create(self)
+            ctx = c.create_context(self)
             if ctx is not None:
                 self.contexts[name] = ctx
 
         self.prepare_contexts()
-        return self.cells
+        return parsed.template.cloneNode(True)
 
     def layout_to_cache(self, layout, parsed):
-        self.__class__.layout_cache[layout] = parsed
+        if "layout" not in self.__reactive_cells__:
+            # by default dynamic layouts are not cached
+            self.__class__.layout_cache[layout] = parsed
 
     def render(self, parent):
-        if not self.context["id"]:
-            self.context["id"] = self.__class__.__name__
+        if not self.context.get("id"):
+            self.context.set("id", self.__class__.__name__)
         self.context.control = self
-        el = document.createElement("div")
-        el.classList.add("lbo-grid")
 
-        parent.appendChild(el)
-        self.render_to_dom(el)
         # when self.element is set, all contexts are initialized
-        self.element = el
+        self.element = self.render_to_dom(parent)
         self.modify_controls()  # may want to have self.element
 
     def iter_fields_controls(self):
@@ -219,22 +236,13 @@ class Grid(Control):
             ctrl.context.container = None
             ctrl.unlink()
 
-    def render_to_dom(self, element):
+    def render_to_dom(self, parent):
         self.unlink_children()
-        self._make_cells()
-        element.innerHTML = ""
-        element.style["grid-template-columns"] = " ".join(
-            [f"{c}fr" if c else "auto" for c in self.column_stretchers])
-        element.style["grid-template-rows"] = " ".join(
-            [f"{c}fr" if c else "auto" for c in self.row_stretchers])
-
-        if sum(self.row_stretchers):
-            element.style.height = "100%"
-        else:
-            element.style.height = ""
-
-        for name, c in self.cells.items():
-            c.render(self, element)
+        element = self.initialize()
+        parent.appendChild(element)
+        for container, c in zip(element.children, self.cells_list):
+            c.render(self, container)
+        return element
 
     def prepare_contexts(self):
         pass
@@ -266,8 +274,19 @@ class Grid(Control):
             self.layout
             yield
             if self.element:
-                self.render_to_dom(self.element)
+                parent = self.element.parentElement
+                parent.innerHTML = ""
+                self.render_to_dom(parent)
                 self.modify_controls()
+
+    @rule
+    def _rule_disabled(self):
+        el = self.element
+        if el:
+            if self.context.observe("disabled"):
+                el.classList.add("disabled")
+            else:
+                el.classList.remove("disabled")
 
 
 def move(operation, lc, lr):
@@ -317,5 +336,5 @@ class GridParser(Parser):
             if label is None:
                 continue
 
-            label.control = c
-            c.label = label
+            label.field = c.name
+            c.label = label.name

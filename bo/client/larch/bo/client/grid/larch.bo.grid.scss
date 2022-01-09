@@ -5,6 +5,8 @@
   overflow: hidden;
   label {
     align-self: center;
+    color: var(--lbo-secondary-text-color);
+    font-size: var(--lbo-font-size-s);
   }
 
   border-radius: var(--lbo-border-radius);
@@ -14,6 +16,11 @@
   }
 }
 
+.lbo-grid.disabled {
+  label {
+    color: var(--lbo-disabled-text-color);
+  }
+}
 
 html, body {
   height: 100%;

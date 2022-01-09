@@ -5,6 +5,8 @@ html {
 
   --lbo-font-family: var(--lumo-font-family);
   --lbo-body-text-color: var(--lumo-body-text-color);
+  --lbo-secondary-text-color: var(--lumo-secondary-text-color);  // labels
+  --lbo-disabled-text-color: var(--lumo-disabled-text-color);  // labels
   --lbo-base-color: var(--lumo-base-color);
 
   --lbo-primary-text-color: var(--lumo-primary-text-color);
@@ -15,4 +17,10 @@ html {
   --lbo-error-text-color: var(--lumo-error-text-color);
 
   --lbo-contrast-20pct: var(--lumo-contrast-20pct);  // border color
+
+  // switch styling
+  --on-color: var(--lumo-primary-text-color);
+  --off-color: var(--lumo-contrast-20pct);
+  --onHandle-color: var(--lumo-primary-contrast-color);
+  --offHandle-color: var(--lumo-primary-contrast-color);
 }

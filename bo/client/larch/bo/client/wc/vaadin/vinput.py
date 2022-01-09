@@ -1,12 +1,13 @@
 from larch.reactive import rule, Cell
-from ...client.control import Control, register as cregister
-from ...client.browser import loading_modules, LiveTracker
+from ...control import Control, register as cregister
+from ...browser import loading_modules, LiveTracker
+from .tools import MixinDisabled
 
 # __pragma__("skip")
 from larch.bo.packer import parcel
 parcel.NEEDED_PACKAGES.update([
     "@vaadin/number-field", "@vaadin/integer-field", "@vaadin/text-field"])
-document = loading_modules
+console = document = loading_modules
 def __pragma__(*args): pass
 # __pragma__("noskip")
 
@@ -20,7 +21,7 @@ loading_modules.push((async () => {
 ''')
 
 
-class TextControl(Control):
+class TextControl(MixinDisabled, Control):
     TAG = "vaadin-text-field"
     element = Cell()
 
@@ -28,13 +29,16 @@ class TextControl(Control):
         self.element = document.createElement(self.TAG)
         parent.appendChild(self.element)
         self.element.addEventListener("change", self.on_change)
+        label = self.context.get("label-element")
+        if label:
+            label.setAttribute("for", self.element.inputElement.id)
 
     def unlink(self):
         super().unlink()
         self.element = None
 
     def get_tab_elements(self):
-        return [self.element.inputElement]
+        return [self.element]
 
     def on_change(self, event):
         self.context.value = self.element.value

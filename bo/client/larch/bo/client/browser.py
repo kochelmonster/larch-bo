@@ -60,6 +60,7 @@ class LiveTracker(Reactive):
 
 
 class Timer(Reactive):
+    TIMER_DELTA = 50   # in ms
     count = Cell(0)
 
     def __init__(self):
@@ -68,7 +69,7 @@ class Timer(Reactive):
     def start(self):
         if not self.started:
             __pragma__('js', '{}', '''
-                setInterval(self.inc, 50);
+            setInterval(self.inc, self.TIMER_DELTA);
             ''')
 
     def inc(self):
@@ -79,6 +80,8 @@ timer = Timer()
 
 
 class Executer:
+    MAX_EXECUTON_TIME = 5   # in ms
+
     def __init__(self):
         self.tasks = deque()
         self.active_id = None
@@ -98,7 +101,7 @@ class Executer:
             task, args = self.tasks.popleft()
             task(*args)
 
-            if window.performance.now() - call_time > 4:
+            if window.performance.now() - call_time > self.MAX_EXECUTION_TIME:
                 self.active_id = window.requestAnimationFrame(self._step)
                 return
         self.active_id = None
@@ -148,3 +151,16 @@ def add_slot(element, slot_name, slot_obj):
 
 def escape(text):
     return __new__(Option(text)).innerHTML
+
+
+def fire_event(etype, bubbles=False, cancelable=False, detail=None, element=None):
+    if element is None:
+        element = BODY
+
+    __pragma__('js', '{}', '''
+        var options = {
+            bubbles: bubbles,
+            cancelable: cancelable,
+            detail: detail };
+        element.dispatchEvent(new CustomEvent(etype, options));
+    ''')

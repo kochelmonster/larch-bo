@@ -2,14 +2,13 @@
 Javascript wrappers
 """
 from collections import deque
-from time import time
 from .control import EventHandler
-from .browser import loading_modules, BODY
+from .browser import loading_modules, BODY, executer
 # __pragma__("skip")
 from larch.bo.packer import parcel
 parcel.NEEDED_PACKAGES.add("vanilla-router")
 document = loading_modules
-window = None
+console = window = None
 def require(p): pass
 def __pragma__(*args): pass
 def create_router(): pass
@@ -36,58 +35,45 @@ function create_router() {
 ''')
 
 
-class SessionComunication:
-    def get_translations(self, language):
-        pass
-
-
 class Session(EventHandler):
-    MAX_TASK_TIME = 0.05
+    """
+    A singlton that handles global management tasks, like
+      - keeping track of taborder
+      - collecting all active commands and keystrokes
+      - interface to transmitter (server communication).
+    Args:
+        root (Control): The root of all Controls
+    """
 
-    def __init__(self, root_container=None):
+    def __init__(self, root):
         self.tasks = deque()
-        self.translations = {}
         self._active_dispatch_id = None
         self._wait_for_tabs = False
         self.router = create_router()
-        self.container = root_container or BODY
+        self.root = root
+        self.root.context.set("session", self)
         set_transmitter(self)
         window.session = self
 
-    def add_task(self, task, *args):
-        self.tasks.append([task, args])
-        if not self._active_dispatch_id:
-            self._active_dispatch_id = window.requestAnimationFrame(self._dispatch_tasks)
+    def boot(self, container=None):
+        """starts rendering"""
+        self.handle_event("new-tabs", self._update_tabindex)
+        if container is None:
+            container = BODY
+        container.innerHTML = ""
+        self.root.context.control = self.root.render(container)
+        return self
 
-    def set_root(self, root):
-        self.root = root
-        self.container.innerHTML = ""
-        root.context.control = root.render(self.container)
+    def add_route(self, path, callback):
+        self.router.add(path, callback)
 
-    def add_route(self, path, creator):
-        self.router.add(path, creator)
-
-    def _dispatch_tasks(self):
-        start = time()
-        # __pragma__("tconv")
-        while self.tasks:
-            # __pragma__("notconv")
-            func, args = self.tasks.popleft()
-            func(*args)
-            if time() - start > self.MAX_TASK_TIME:
-                break
-
-        if self.tasks:
-            self._active_dispatch_id = window.requestAnimationFrame(self._dispatch_tasks)
-        else:
-            self._active_dispatch_id = None
-
-    def update_tabindex(self):
+    def _update_tabindex(self):
         if not self._wait_for_tabs:
             self._wait_for_tabs = True
-            self.add_task(self.build_tabindex)
+            executer.add(self._build_tabindex)
 
-    def build_tabindex(self, root=None):
+    def _build_tabindex(self, root=None):
+        console.log("***build tabindex")
         root = root if root is not None else self.root
         tindex = 1000
         for c in root.get_tab_elements():
@@ -96,9 +82,3 @@ class Session(EventHandler):
 
         self._wait_for_tabs = False
         self.fire_event("tabindex-done")
-
-    def install_language(self, language):
-        self.get_translations(language).then(self._set_translation)
-
-    def _set_translation(self, translations):
-        self.translations = translations["map"]

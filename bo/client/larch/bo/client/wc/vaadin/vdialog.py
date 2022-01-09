@@ -71,7 +71,6 @@ class Dialog:
         root.innerHTML = ""
         if self.context.control:
             self.context.control.render(root)
-            self.context.update_tabindex()
 
     def unlink(self):
         super().unlink()

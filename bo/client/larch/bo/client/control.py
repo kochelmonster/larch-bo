@@ -1,7 +1,7 @@
 """larch browser objects Rendering engine"""
 import larch.lib.adapter as adapter
-from larch.reactive import Pointer, rcontext, Container, Reactive, Cell, rule
-from .browser import BODY
+from larch.reactive import Pointer, Reactive, Cell, rule, untouched
+from .browser import BODY, fire_event
 
 
 # __pragma__("skip")
@@ -46,16 +46,7 @@ class EventHandler:
 
     # __pragma__("tconv")
     def fire_event(self, etype, bubbles=False, cancelable=False, detail=None, element=None):
-        if element is None:
-            element = BODY
-
-        __pragma__('js', '{}', '''
-            var options = {
-                bubbles: bubbles,
-                cancelable: cancelable,
-                detail: detail };
-            element.dispatchEvent(new CustomEvent(etype, options));
-        ''')
+        fire_event(etype, bubbles, cancelable, detail, element)
 
     def handle_event(self, name, listener, capture=False, element=None):
         if element is None:
@@ -131,6 +122,7 @@ class TextControl(HTMLControl):
 
 class ControlContext(Reactive):
     _value = Cell()
+    _observed_changed = Cell(0)
 
     # __pragma__ ('kwargs')
     def __init__(self, value=None, parent=None, **kwargs):
@@ -138,6 +130,7 @@ class ControlContext(Reactive):
         self._value = value
         self.parent = parent
         self.options = kwargs
+        self.observed = {}   # __:jsiter
     # __pragma__ ('nokwargs')
 
     # __pragma__ ('jscall')
@@ -165,43 +158,25 @@ class ControlContext(Reactive):
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.options}>"
 
-    def update_tabindex(self):
-        session = self.get("session")
-        if session is not None:
-            session.update_tabindex()
-
     def observe(self, name):
+        self._observed_changed   # touch
+        self.observed[name] = True
         value = self.options.get(name)
-        if value is not None:
-            if isinstance(value, Container):
-                return value.get_value()
-        elif self.parent is not None:
-            value = self.parent.observe(name)
-            if value is not None:
-                return value
-
-        if rcontext.inside_rule:
-            # transform to container
-            self.options[name] = container = Container(value)
-            return container.get_value()
-
+        if value is None and self.parent is not None:
+            return self.parent.observe(name)
         return value
 
     def get(self, name):
         value = self.options.get(name)
         if value is None and self.parent is not None:
             return self.parent.get(name)
-
-        if isinstance(value, Container):
-            return value.get_value()
         return value
 
     def set(self, name, value):
-        val = self.options.get(name)
-        if isinstance(val, Container):
-            val.set_value(value)
-        else:
-            self.options[name] = value
+        self.options[name] = value
+        if name in self.observed:
+            with untouched():  # if called in a rule
+                self._observed_changed += 1
         return self
     # __pragma__ ('nojscall')
 
@@ -238,4 +213,4 @@ class RenderingContext(ControlContext):
             self.old_control_key = key
             self.control = create_control_factory(self)
             self.render_to_container()
-            self.update_tabindex()
+            fire_event("new-tabs")
