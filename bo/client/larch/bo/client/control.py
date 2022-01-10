@@ -1,7 +1,7 @@
 """larch browser objects Rendering engine"""
 import larch.lib.adapter as adapter
-from larch.reactive import Pointer, Reactive, Cell, rule, untouched
-from .browser import BODY, fire_event
+from larch.reactive import Pointer, Reactive, Cell, rule, untouched, rcontext
+from .browser import fire_event
 
 
 # __pragma__("skip")
@@ -50,7 +50,7 @@ class EventHandler:
 
     def handle_event(self, name, listener, capture=False, element=None):
         if element is None:
-            element = BODY
+            element = document.body
         element.addEventListener(name, listener, capture)
 
     def unlink(self):
@@ -159,8 +159,11 @@ class ControlContext(Reactive):
         return f"<{self.__class__.__name__} {self.options}>"
 
     def observe(self, name):
-        self._observed_changed   # touch
-        self.observed[name] = True
+        if rcontext.inside_rule:
+            # transform to container
+            self._observed_changed   # touch
+            self.observed[name] = True
+
         value = self.options.get(name)
         if value is None and self.parent is not None:
             return self.parent.observe(name)

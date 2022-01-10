@@ -1,5 +1,5 @@
 from ...control import RenderingContext
-from ...browser import loading_modules, BODY
+from ...browser import loading_modules
 
 # __pragma__("skip")
 from larch.bo.packer import parcel
@@ -43,7 +43,7 @@ class Dialog:
         self.result_callback = result_callback
         dialog = document.createElement(self.TAG)
         dialog.renderer = self._render_into_dialog
-        BODY.append(dialog)
+        document.body.append(dialog)
         self.context.container = dialog
         for id_, value in kwargs.items():
             dialog[id_] = value

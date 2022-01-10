@@ -1,7 +1,7 @@
-from larch.reactive import rule, Cell
+from larch.reactive import rule
 from ...control import Control, register as cregister
 from ...browser import loading_modules
-from .tools import MixinDisabled
+from .tools import MixinVaadin, MixinStyleObserver
 
 # __pragma__("skip")
 from larch.bo.packer import parcel
@@ -20,22 +20,14 @@ loading_modules.push((async () => {
 ''')
 
 
-class SwitchControl(MixinDisabled, Control):
+class SwitchControl(MixinVaadin, MixinStyleObserver, Control):
     TAG = "jelly-switch"
-    element = Cell()
 
     def render(self, parent):
         self.element = document.createElement(self.TAG)
         self.element.checked = self.context.value
         parent.appendChild(self.element)
         self.element.addEventListener("toggle", self.on_change)
-
-    def unlink(self):
-        super().unlink()
-        self.element = None
-
-    def get_tab_elements(self):
-        return [self.element]
 
     def on_change(self, event):
         self.context.value = self.element.checked

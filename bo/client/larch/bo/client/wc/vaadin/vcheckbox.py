@@ -1,7 +1,7 @@
 from larch.reactive import rule, Cell
 from ...control import Control, register as cregister
 from ...browser import loading_modules
-from .tools import MixinDisabled
+from .tools import MixinVaadin, MixinStyleObserver
 
 # __pragma__("skip")
 from larch.bo.packer import parcel
@@ -18,7 +18,7 @@ loading_modules.push((async () => {
 ''')
 
 
-class CheckboxControl(MixinDisabled, Control):
+class CheckboxControl(MixinVaadin, MixinStyleObserver, Control):
     TAG = "vaadin-checkbox"
     element = Cell()
 
@@ -26,13 +26,9 @@ class CheckboxControl(MixinDisabled, Control):
         self.element = document.createElement(self.TAG)
         parent.appendChild(self.element)
         self.element.addEventListener("change", self.on_change)
-
-    def unlink(self):
-        super().unlink()
-        self.element = None
-
-    def get_tab_elements(self):
-        return [self.element]
+        label = self.context.get("label-element")
+        if label:
+            label.setAttribute("for", self.element.inputElement.id)
 
     def on_change(self, event):
         self.context.value = self.element.checked

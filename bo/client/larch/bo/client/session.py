@@ -3,7 +3,7 @@ Javascript wrappers
 """
 from collections import deque
 from .control import EventHandler
-from .browser import loading_modules, BODY, executer
+from .browser import loading_modules, executer
 # __pragma__("skip")
 from larch.bo.packer import parcel
 parcel.NEEDED_PACKAGES.add("vanilla-router")
@@ -59,7 +59,7 @@ class Session(EventHandler):
         """starts rendering"""
         self.handle_event("new-tabs", self._update_tabindex)
         if container is None:
-            container = BODY
+            container = document.body
         container.innerHTML = ""
         self.root.context.control = self.root.render(container)
         return self

@@ -1,10 +1,12 @@
 from datetime import date
 from larch.reactive import Reactive, Cell, rule
-from larch.bo.client.wc.vaadin import vbutton, vinput, vcheckbox, vswitch, styles
+from larch.bo.client.wc.vaadin import vbutton, vinput, vcheckbox, vswitch, vdate, styles
 from larch.bo.client.grid import Grid
 from larch.bo.client.browser import start_main
 from larch.bo.client.session import Session
 from larch.bo.client.control import register
+from larch.bo.client.command import label, icon
+from larch.bo.client.animate import animate
 
 # __pragma__("skip")
 window = document = console = styles
@@ -13,6 +15,7 @@ def __pragma__(*args): pass
 # __pragma__("noskip")
 
 
+vdate.register()
 vbutton.register()
 vinput.register()
 vcheckbox.register()
@@ -42,25 +45,18 @@ class CheckForm(AllLive, Grid):
     layout = """
 First Name|[first]
 Last Name |[last]
-Email     |[email]
+Email     |[email]@email
 Birthday  |[birthday]
 Password  |[password]@password
-          |[accept]
+Accept    |[accept]
+          |[.open]
           |<1>
 """
 
-    layout = """
-First Name|[first]
-Last Name |[last]
-Email     |[email]
-Password  |[password]@password
-          |[accept]
-          |<1>
-"""
-
-    def modify_controls(self):
-        super().modify_controls()
-        self.celement("accept").label = "Accept"
+    @icon("check")
+    @label("Open Dialog")
+    def open(self):
+        console.log("submit")
 
 
 @register(Model, "switch")
@@ -80,7 +76,6 @@ Accept|[accept]@switch
         self.set_input("last", "Last Name")
         self.celement("email").label = "Email"
         self.celement("password").label = "Password"
-        self.celement("accept")
 
     def set_input(self, name, label):
         el = self.celement(name)
@@ -92,24 +87,34 @@ class Controller(Grid):
     layout = """
 Show Form1     |[.show_form1]@switch
 Show Form2     |[.show_form2]@switch
-Toggle Birthday|[.birthday_as_text]@switch
+Toggle Acccept |[.accept_is_switch]@switch
 Disable        |[.disabled]@switch
 Readonly       |[.readonly]@switch
 """
 
     show_form1 = Cell(True)
     show_form2 = Cell(True)
-    birthday_as_text = Cell(False)
+    accept_is_switch = Cell(False)
     disabled = Cell(False)
     readonly = Cell(False)
 
 
 class HTMLEditor(Grid):
     layout = """
-[.content]@multi|[.content]@html
-<1>             |<1>
+Editor               |Preview
+edit:[.content]@multi|preview:[.content]@html|<1>
+<1>                  |<1>
 """
-    content = Cell("")
+    content = Cell("""
+<h1>Hello</h1>
+World""")
+
+    def modify_controls(self):
+        edit = self.control("edit")
+        style = edit.element.style
+        style.width = "100%"
+        style.height = "100%"
+        edit.live()
 
 
 class Frame(Grid):
@@ -127,13 +132,19 @@ f2:[.person]{2}@switch|   "
         self.controller = Controller()
 
     @rule
+    def _rule_accept_styles(self):
+        if self.element:
+            controller = self.control("controller")
+            self.control("f1").contexts["accept"].set(
+                "style", "switch" if controller.accept_is_switch else "")
+
+    @rule
     def _rule_controller_styles(self):
         if self.element:
             controller = self.control("controller")
-            self.container("f1").style.display = "" if controller.show_form1 else "none"
-            self.container("f2").style.display = "" if controller.show_form2 else "none"
+            animate.show(self.container("f1"), controller.show_form1)
+            animate.show(self.container("f2"), controller.show_form2)
 
-            console.log("***set disabled?", controller.disabled)
             self.contexts["f1"].set("disabled", controller.disabled)
             self.contexts["f2"].set("disabled", controller.disabled)
             self.contexts["f1"].set("readonly", controller.readonly)

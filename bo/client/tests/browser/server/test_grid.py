@@ -2,7 +2,7 @@
 from larch.bo.client.wc.vaadin import vbutton, vinput
 from larch.bo.client.grid import Grid
 from larch.bo.client.session import Session
-from larch.bo.client.browser import BODY, start_main
+from larch.bo.client.browser import start_main
 from larch.bo.client.qt import create_window_container, calc_minsize
 from larch.reactive import Cell, rule
 
@@ -163,7 +163,7 @@ def adjust_size():
 
 def main():
     print("start main")
-    root_container = create_window_container(BODY)
+    root_container = create_window_container(document.body)
 
     frame = Frame()
     print("--build frame")
@@ -171,7 +171,7 @@ def main():
     print("--set session")
     window.session.set_root(frame)
     window.grid = frame.content
-    BODY.addEventListener("tabindex-done", tabs_changed)
+    document.body.addEventListener("tabindex-done", tabs_changed)
     window.addEventListener("qtready", adjust_size)
     console.log("main ready")
 

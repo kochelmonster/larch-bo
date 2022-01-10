@@ -13,8 +13,14 @@
   > div {
     padding: var(--lbo-space-xs);
     overflow: hidden;
+
+    &.hidden {
+        padding: 0;
+        height: 0;
+    }
   }
 }
+
 
 .lbo-grid.disabled {
   label {

@@ -1,7 +1,7 @@
 """file transfer functions"""
 from time import time
 from larch.reactive import Reactive, Cell
-from ..browser import BODY, executer, create_promise, loading_modules
+from ..browser import executer, create_promise, loading_modules
 from ..i18n import pgettext
 
 # __pragma__("skip")
@@ -135,7 +135,7 @@ class FileUploader(Reactive):
             controller.accept = self.accept
 
         controller.style.position = "absolute"
-        BODY.appendChild(controller)
+        document.body.appendChild(controller)
         controller.click()
         controller.remove()
         controller.onchange = lambda event: self.start_upload(event.target.files)

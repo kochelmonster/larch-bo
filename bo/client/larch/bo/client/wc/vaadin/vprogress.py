@@ -1,6 +1,7 @@
-from larch.reactive import rule, Cell
+from larch.reactive import rule
 from ...control import Control, register as cregister
 from ...browser import loading_modules
+from .tools import MixinVaadin
 
 # __pragma__("skip")
 from larch.bo.packer import parcel
@@ -17,20 +18,15 @@ loading_modules.push((async () => {
 ''')
 
 
-class ProgressControl(Control):
+class ProgressControl(MixinVaadin, Control):
     TAG = "vaadin-progress-bar"
-    element = Cell()
 
     def render(self, parent):
         self.element = document.createElement(self.TAG)
         parent.appendChild(self.element)
 
-    def unlink(self):
-        super().unlink()
-        self.element = None
-
     def get_tab_elements(self):
-        return [self.element]
+        return []
 
     @rule
     def _rule_update_value(self):
