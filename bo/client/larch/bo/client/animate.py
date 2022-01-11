@@ -26,7 +26,9 @@ class Animator:
     """
 
     animation_objects = {
-        ".lbo-grid": ["grid-template-columns", "grid-template-rows"]
+        ".lbo-grid": ["grid-template-columns", "grid-template-rows"],
+        ".appearing": ["opacity"],
+        ".disappearing": ["opacity"]
     }
 
     def __init__(self):
@@ -51,28 +53,87 @@ class Animator:
         self.calc_animation_duration = lambda size: min(a*size + t, long)
         return self
 
+    def add(self, style, before, after):
+        if self.styles_changed is None:
+            self.styles_changed = []
+            executer.add(self.start_animation)
+        self.styles_changed.append([style, before, after])
+        return self
+
     def change_style(self, element, style, value, transform=True):
-        current_value = element.style[style]
-        if current_value == value:
+        """
+        Change a css style property of element, and initiate the corresponding animation.
+
+        Args:
+            element (dom element): the element to manipulate
+            style (str): the css style name (e.g. "display")
+            value (str): the style value
+            transform (bool): If True the style will be set to the old value at
+                              the beginning of the transformation and set to value at the end.
+        """
+        old_value = element.style[style]
+        if old_value == value:
             return self
 
         if self.animated_elements is not None:
             element.style[style] = value
             return self
 
-        if self.styles_changed is None:
-            self.styles_changed = []
-            executer.add(self.start_animation)
+        def set_to_value(finished=False):
+            element.style[style] = value
+            if style == "display":
+                return "hide" if value == "none" else "show"
 
-        self.styles_changed.append([element, style, current_value if transform else value, value])
-        return self
+        def set_to_old():
+            element.style[style] = old_value
+
+        return self.add(style, set_to_old if transform else set_to_value, set_to_value)
 
     def show(self, element, visible):
+        """
+        Shows or hides a element.
+        Args:
+            element(dom element): the element to manipulate.
+            visible (bool/str): if visible is False sets the display style of element to "none".
+        """
+
         if visible:
             visible = visible if isinstance(visible, str) else ""
             return self.change_style(element, "display", visible, False)
         else:
             return self.change_style(element, "display", "none")
+
+    def replace(self, old_, new_):
+        """
+        Replaces an old element by a new element, and initiates the corresponding animation.
+        Args:
+            new_ (dom element): The new element that will appear.
+            old_ (dom element): The old Element that will be removed.
+        """
+        if self.animated_elements is not None:
+            old_.remove()
+            return self
+
+        old_position = old_.style.position
+        new_.style.opacity = "0"
+        new_.classList.add("appearing")
+        old_.classList.add("disappearing")
+        console.log("**replace")
+
+        def after(finished):
+            new_.style.opacity = ""
+            if finished:
+                new_.classList.remove("appearing")
+                old_.remove()
+            else:
+                old_.style.opacity = "0"
+                old_.style.position = "absolute"
+            return "show"
+
+        def before():
+            old_.style.position = old_position
+
+        return self.add("display", before, after)
 
     def start_animation(self):
         # read state before styles changes
@@ -95,13 +156,12 @@ class Animator:
         hidding_objects = False
 
         # apply changes
-        for element, style_id, before, after in self.styles_changed:
-            element.style[style_id] = after
-            if style_id == "display":
-                if after == "none":
-                    showing_objects = True
-                else:
-                    hidding_objects = True
+        for style_id, before, after in self.styles_changed:
+            action = after(False)
+            if action == "show":
+                showing_objects = True
+            elif action == "hide":
+                hidding_objects = True
 
         animation_size = 0
         # read state afterwards
@@ -127,11 +187,10 @@ class Animator:
                 dp_size = animation_size * 2.22 / get_metrics().pt_height
                 duration = self.calc_animation_duration(dp_size)
 
-            console.log("***start animation", duration, animated)
             self.animated_elements = animated
             # revert_changes
-            for element, style, before, after in self.styles_changed:
-                element.style[style] = before
+            for style, before, after in self.styles_changed:
+                before()
 
             # define animation
             # __pragma__("jsiter")
@@ -154,10 +213,9 @@ class Animator:
             self.animated_elements = self.styles_changed = None
 
     def _transition_end(self):
-        console.log("**done animation", self.animated_elements)
         # revert all style settings, changed by animation
-        for element, style, before, after in self.styles_changed:
-            element.style[style] = after
+        for style, before, after in self.styles_changed:
+            after(True)
         for props in self.animated_elements:
             props["element"].style[props["style"]] = props["restore"]
         self.animated_elements = self.styles_changed = None
@@ -171,4 +229,4 @@ def calc_animation_size(before, after):
     return delta
 
 
-animate = Animator()
+animator = Animator()

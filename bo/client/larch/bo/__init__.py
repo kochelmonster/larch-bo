@@ -8,7 +8,8 @@ todos:
    - file upload test
 
 grid:
-  - css animation
+  - splitter
+
 
 - gettext/i18n
 - Tab-ensure (stellt sicher dass der focus immer auf einen tab ist)
@@ -23,12 +24,17 @@ grid:
 
 
 Heute
+    - splitter
+    - state save
+    - dialog mit overflow testen
 
-- table parser
-- Grid / cache als dom template
-  Wie overflow: parent-grid -> max-heigt 100%  gridaray: overflow: auto
+    - commands
 
-- css-animationen im grid
-- fastcall  wenn möglich
+Table:
+   - fixed columns
+   - state save
+   - table handler
+   - tree handler
+   - multi selection
 
 """

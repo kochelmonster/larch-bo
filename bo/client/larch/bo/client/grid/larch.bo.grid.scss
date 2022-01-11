@@ -12,12 +12,8 @@
   border-radius: var(--lbo-border-radius);
   > div {
     padding: var(--lbo-space-xs);
-    overflow: hidden;
+    overflow: auto;
 
-    &.hidden {
-        padding: 0;
-        height: 0;
-    }
   }
 }
 
@@ -42,4 +38,5 @@ html {
 
 h3 {
   font-size: var(--lbo-font-size-m);
+  margin: 0;
 }

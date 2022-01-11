@@ -1,6 +1,6 @@
 from larch.reactive import rule
-from ...control import Control, register as cregister
-from ...browser import loading_modules, LiveTracker
+from ...control import Control, register as cregister, MixinLiveTracker
+from ...browser import loading_modules
 from .tools import MixinVaadin, MixinStyleObserver
 
 # __pragma__("skip")
@@ -25,15 +25,13 @@ loading_modules.push((async () => {
 ''')
 
 
-class TextControl(MixinVaadin, MixinStyleObserver, Control):
+class TextControl(MixinLiveTracker, MixinVaadin, MixinStyleObserver, Control):
     TAG = "vaadin-text-field"
+    tracker = None
 
     def render(self, parent):
         element = document.createElement(self.TAG)
         parent.appendChild(element)
-
-        # <input slot="input" tabindex="1001">
-
         self.element = element
         label = self.context.get("label-element")
         if label:
@@ -41,20 +39,11 @@ class TextControl(MixinVaadin, MixinStyleObserver, Control):
 
         element.addEventListener("change", self.on_change)
 
-    def get_tab_elements(self):
-        return [self.element.inputElement]
-
     def on_change(self, event):
         self.context.value = self.element.value
 
-    def live(self):
-        self._old_value = self.element.value
-        self.tracker = LiveTracker(self._watch_for_change)
-        return self
-
-    def _watch_for_change(self):
-        if self._old_value != self.element.value:
-            self.context.value = self._old_value = self.element.value
+    def get_poll_value(self):
+        return self.element.value
 
     def update_styles(self):
         super().update_styles()

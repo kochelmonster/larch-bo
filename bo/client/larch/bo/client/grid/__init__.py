@@ -1,5 +1,6 @@
 import re
 from larch.reactive import rule, Pointer, Cell
+from ..animate import animator
 from ..i18n import pgettext as translate
 from ..textlayout import DOMCell, Empty, AlignedCell, Parser, Stretcher, RowSpan, walk_pointer
 from ..control import Control, RenderingContext
@@ -23,6 +24,17 @@ class FieldContext(RenderingContext):
         self.options["id"] = self.parent.get("id") + "." + cell.name
         if cell.style:
             self.options["style"] = cell.style
+
+    def render_to_container(self):
+        old_ = self.container.firstChild
+        if old_:
+            old_.remove()
+            tmp = self.container.cloneNode()
+            tmp.appendChild(old_)
+            self.container.parentElement.appendChild(tmp)
+            animator.replace(tmp, self.container)
+
+        self.control.render(self.container)
 
 
 class Label(AlignedCell):

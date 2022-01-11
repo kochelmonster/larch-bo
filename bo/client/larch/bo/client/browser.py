@@ -63,40 +63,6 @@ def as_array(pyobj):
     ''')
 
 
-class LiveTracker(Reactive):
-    """A Mixin for controls to watch live values"""
-
-    def __init__(self, callback):
-        self.callback = callback
-        timer.start()
-
-    @rule
-    def _rule_watch_timer(self):
-        timer.count
-        yield
-        self.callback()
-
-
-class Timer(Reactive):
-    TIMER_DELTA = 50   # in ms
-    count = Cell(0)
-
-    def __init__(self):
-        self.started = False
-
-    def start(self):
-        if not self.started:
-            __pragma__('js', '{}', '''
-            setInterval(self.inc, self.TIMER_DELTA);
-            ''')
-
-    def inc(self):
-        self.count += 1
-
-
-timer = Timer()
-
-
 class Executer:
     MAX_EXECUTON_TIME = 5   # in ms
 

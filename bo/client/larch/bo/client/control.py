@@ -5,8 +5,9 @@ from .browser import fire_event
 
 
 # __pragma__("skip")
-document = console = None
+clearInterval = setInterval = document = console = None
 def __pragma__(*args): pass
+
 # __pragma__("noskip")
 
 
@@ -130,6 +131,7 @@ class ControlContext(Reactive):
         self._value = value
         self.parent = parent
         self.options = kwargs
+        self.options.setdefault("style", "")  # never bubble style
         self.observed = {}   # __:jsiter
     # __pragma__ ('nokwargs')
 
@@ -210,10 +212,42 @@ class RenderingContext(ControlContext):
 
         key = self.control_key()
         if key != self.old_control_key:
+            self.old_control_key = key
             yield
             if self.control is not None:
                 self.control.unlink()
-            self.old_control_key = key
             self.control = create_control_factory(self)
             self.render_to_container()
             fire_event("new-tabs")
+
+
+class MixinLiveTracker:
+    """A Mixin for live value tracking"""
+
+    TIMER_DELTA = 50
+    timer_id = None
+
+    def unlink(self):
+        self.stop_live()
+        super().unlink()
+
+    def get_poll_value(self):
+        """must be implemented by child class"""
+        pass
+
+    def stop_live(self):
+        if self.timer_id is not None:
+            clearInterval(self.timer_id)
+            self.timer_id = None
+
+    def live(self):
+        """starts live tracking"""
+        if self.timer_id is None:
+            self._old_value = self.get_poll_value()
+            self.timer_id = setInterval(self._poll, self.TIMER_DELTA)
+        return self
+
+    def _poll(self):
+        value = self.get_poll_value()
+        if self._old_value != value:
+            self.context.value = self._old_value = value
