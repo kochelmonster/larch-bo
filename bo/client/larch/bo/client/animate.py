@@ -9,6 +9,34 @@ def __new__(*args): pass
 # __pragma__("noskip")
 
 
+__pragma__("ifdef", "noanimation")
+
+
+class NoAnimator:
+    def set_curve(self, short, long, show, hide):
+        pass
+
+    def change_style(self, element, style, value, transform=True):
+        element.style[style] = value
+        return self
+
+    def show(self, element, visible):
+        if visible:
+            visible = visible if isinstance(visible, str) else ""
+            return self.change_style(element, "display", visible, False)
+        else:
+            return self.change_style(element, "display", "none")
+
+    def replace(self, old_, new_):
+        old_.remove()
+        return self
+
+
+animator = NoAnimator()
+
+__pragma__("else")
+
+
 anime = None
 
 
@@ -230,3 +258,5 @@ def calc_animation_size(before, after):
 
 
 animator = Animator()
+
+__pragma__("endif")

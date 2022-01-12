@@ -92,6 +92,9 @@ def transpile(linker):
     if verbosity >= 3:
         symbols.append("verbose3")
 
+    if linker.config.get("noanimation"):
+        symbols.append("noanimation")
+
     try:
         classic = linker.config["args"].classic
     except (AttributeError, KeyError):

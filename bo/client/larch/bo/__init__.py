@@ -9,6 +9,7 @@ todos:
 
 grid:
   - splitter
+    touchevents
 
 
 - gettext/i18n
@@ -23,18 +24,22 @@ grid:
 
 
 
-Heute
-    - splitter
-    - state save
-    - dialog mit overflow testen
-
-    - commands
-
 Table:
    - fixed columns
    - state save
    - table handler
    - tree handler
    - multi selection
+
+
+Heute
+    - splitter
+    - state save (msgpack/json)
+    - DB LayoutCache in db implementieren und testen
+    - Fuse mit ebdav in sourcen schauen
+    - commands
+    - animation mit config["debug"] ausschaltbar machen
+
+
 
 """

@@ -127,7 +127,6 @@ class TableParser(Parser):
     CELL_TYPES = (Content, Empty, Selector, HorzSeparator, Stretcher, RowSpan, Label)
 
     def __init__(self, layout):
-        console.log("****parse table layout")
         super().__init__(layout)
         rows = iter(self.rows)
         self.header = list(takewhile(lambda r: len(r), rows))
@@ -245,7 +244,7 @@ class Table(Control):
     def render_to_dom(self, element):
         self.process_layout()
         self.viewport.style["grid-template-columns"] = " ".join(
-            [f"{c}fr" if c else "auto" for c in self.stretchers])
+            [f"{c.stretch}fr" if c.stretch else "auto" for c in self.stretchers])
 
         self.render_context = {}
         console.log("***render table")

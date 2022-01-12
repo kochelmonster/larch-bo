@@ -16,13 +16,13 @@ class GridLayoutTest(unittest.TestCase):
             "[[<Label a-(0, 0),(0, 0){}>, <Spacer-(1, 1),(0, 0)>, <Field b-(2, 2),(0, 0){}>]]")
         self.assertEqual(p.row_count, 1)
         self.assertEqual(p.column_count, 3)
-        self.assertEqual(p.row_stretchers, [0])
-        self.assertEqual(p.column_stretchers, [0, 0, 0])
+        self.assertEqual(repr(p.row_stretchers), "[<0>]")
+        self.assertEqual(repr(p.column_stretchers), "[<0>, <0>, <0>]")
 
     def test_case2(self):
         p = self.parse("""
 a  |(10,1)|[b]
-[c]|      |[d]|<1>
+[c]|      |[d]|<1t>
    |  <1> |
 """)
         self.assertEqual(
@@ -31,15 +31,15 @@ a  |(10,1)|[b]
              "[<Field c-(0, 0),(1, 1){}>, <Field d-(2, 2),(1, 1){}>]]"))
         self.assertEqual(p.row_count, 2)
         self.assertEqual(p.column_count, 3)
-        self.assertEqual(p.row_stretchers, [0, 1.0])
-        self.assertEqual(p.column_stretchers, [0, 1.0, 0])
+        self.assertEqual(repr(p.row_stretchers), "[<0>, <1.0t>]")
+        self.assertEqual(repr(p.column_stretchers), "[<0>, <1.0>, <0>]")
 
     def test_case3(self):
         p = self.parse("""
 a  |(10,1)|[b]
 [c]|      | "     |<1>
  " |      |[d]|[e]
-   |  <1> |   |<1>|
+   | <1r> |   |<1>|
 """)
 
         self.assertEqual(
@@ -49,8 +49,8 @@ a  |(10,1)|[b]
              "[<Field d-(2, 2),(2, 2){}>, <Field e-(3, 3),(2, 2){}>]]"))
         self.assertEqual(p.row_count, 3)
         self.assertEqual(p.column_count, 4)
-        self.assertEqual(p.row_stretchers, [0, 1.0, 0])
-        self.assertEqual(p.column_stretchers, [0, 1.0, 0, 1.0])
+        self.assertEqual(repr(p.row_stretchers), "[<0>, <1.0>, <0>]")
+        self.assertEqual(repr(p.column_stretchers), "[<0>, <1.0r>, <0>, <1.0>]")
 
     def test_case4(self):
         p = self.parse("""
@@ -61,8 +61,8 @@ ad:[active_displays[0]]{cm}|<1>
         self.assertEqual(p.rows[0][0].path, "active_displays[0]")
         self.assertEqual(p.row_count, 1)
         self.assertEqual(p.column_count, 1)
-        self.assertEqual(p.row_stretchers, [1.0])
-        self.assertEqual(p.column_stretchers, [1.0])
+        self.assertEqual(repr(p.row_stretchers), "[<1.0>]")
+        self.assertEqual(repr(p.column_stretchers), "[<1.0>]")
 
     def test_case5(self):
         p = self.parse("""a:a|(10,1)|b:[b]""")
@@ -71,8 +71,8 @@ ad:[active_displays[0]]{cm}|<1>
             "[[<Label a-(0, 0),(0, 0){}>, <Spacer-(1, 1),(0, 0)>, <Field b-(2, 2),(0, 0){}>]]")
         self.assertEqual(p.row_count, 1)
         self.assertEqual(p.column_count, 3)
-        self.assertEqual(p.row_stretchers, [0])
-        self.assertEqual(p.column_stretchers, [0, 0, 0])
+        self.assertEqual(repr(p.row_stretchers), "[<0>]")
+        self.assertEqual(repr(p.column_stretchers), "[<0>, <0>, <0>]")
 
     def test_case6(self):
         p = self.parse("""

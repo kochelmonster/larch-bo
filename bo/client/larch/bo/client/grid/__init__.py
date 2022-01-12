@@ -2,7 +2,7 @@ import re
 from larch.reactive import rule, Pointer, Cell
 from ..animate import animator
 from ..i18n import pgettext as translate
-from ..textlayout import DOMCell, Empty, AlignedCell, Parser, Stretcher, RowSpan, walk_pointer
+from ..textlayout import DOMCell, Empty, AlignedCell, Parser, RowSpan, Cell as PCell, walk_pointer
 from ..control import Control, RenderingContext
 
 # __pragma__("skip")
@@ -146,6 +146,21 @@ class Spacer(DOMCell):
         pass
 
 
+class Stretcher(PCell):
+    EXPRESSION = re.compile(r"<(\d+)([lrtb]?)>")
+
+    def __init__(self, stretch=0, splitter=""):
+        self.stretch = stretch
+        self.splitter = splitter
+
+    def __repr__(self):
+        return f"<{self.stretch}{self.splitter}>"
+
+    @classmethod
+    def create_cell(cls, mo):
+        return cls(float(mo.group(1)), mo.group(2) or "")
+
+
 class Grid(Control):
     """
     Layouts children as grid by a textual description.
@@ -161,7 +176,7 @@ class Grid(Control):
     """
 
     layout_cache = {}
-    fields = []
+    compiled = None
     element = Cell()
 
     @property
@@ -171,52 +186,51 @@ class Grid(Control):
             return self.context.parent.control
 
     def initialize(self):
-        parsed = self.__class__.layout_cache.get(self.layout)
-        if parsed is None:
+        compiled = self.__class__.layout_cache.get(self.layout)
+        if compiled is None:
             tindex = 1000
-            parsed = {}
-            parsed.fields = []
-            parsed.cells = {}
+            compiled = {}
+            compiled.fields = []
+            compiled.cells = {}
             parser = GridParser(self.layout)
             for row in parser.rows:
                 for c in row:
-                    parsed.cells[c.name] = c
+                    compiled.cells[c.name] = c
                     if isinstance(c, Field):
                         if c.tabindex is None:
                             c.tabindex = tindex
                             tindex += 1
-                        parsed.fields.append(c)
+                        compiled.fields.append(c)
 
-            parsed.fields.sort(lambda c: int(c.tabindex))
+            compiled.fields.sort(lambda c: int(c.tabindex))
+            compiled.template = self.create_template(parser, compiled)
+            self.layout_to_cache(self.layout, compiled, parser)
 
-            parsed.template = el = document.createElement("div")
-            el.classList.add("lbo-grid")
-            el.style["grid-template-columns"] = " ".join(
-                [f"{c}fr" if c else "auto" for c in parser.column_stretchers])
-            el.style["grid-template-rows"] = " ".join(
-                [f"{c}fr" if c else "auto" for c in parser.row_stretchers])
-
-            if sum(parser.row_stretchers):
-                el.style.height = "100%"
-
-            parsed.cells_list = list(parsed.cells.values())
-            for c in parsed.cells_list:
-                c.create_template(el)
-
-            self.layout_to_cache(self.layout, parsed)
-
-        self.fields = parsed.fields
-        self.cells = parsed.cells
-        self.cells_list = parsed.cells_list
-
+        self.compiled = compiled
         self.contexts = {}
-        for name, c in self.cells.items():
+        for name, c in compiled.cells.items():
             ctx = c.create_context(self)
             if ctx is not None:
                 self.contexts[name] = ctx
 
         self.prepare_contexts()
-        return parsed.template.cloneNode(True)
+        return compiled.template.cloneNode(True)
+
+    def create_template(self, parser, compiled):
+        el = document.createElement("div")
+        el.classList.add("lbo-grid")
+        el.style["grid-template-columns"] = " ".join(
+            [f"{c.stretch}fr" if c.stretch else "auto" for c in parser.column_stretchers])
+        el.style["grid-template-rows"] = rows = " ".join(
+            [f"{c.stretch}fr" if c.stretch else "auto" for c in parser.row_stretchers])
+        if "fr" in rows:
+            el.style.height = "100%"
+
+        compiled.cells_list = list(compiled.cells.values())
+        for c in compiled.cells_list:
+            c.create_template(el)
+
+        return el
 
     def layout_to_cache(self, layout, parsed):
         if "layout" not in self.__reactive_cells__:
@@ -233,7 +247,7 @@ class Grid(Control):
         self.modify_controls()  # may want to have self.element
 
     def iter_fields_controls(self):
-        for f in self.fields:
+        for f in self.compiled.fields:
             ctx = self.contexts[f.name]
             if ctx and ctx.control is not None:
                 yield ctx.control
@@ -249,10 +263,11 @@ class Grid(Control):
             ctrl.unlink()
 
     def render_to_dom(self, parent):
-        self.unlink_children()
+        if self.compiled:
+            self.unlink_children()
         element = self.initialize()
         parent.appendChild(element)
-        for container, c in zip(element.children, self.cells_list):
+        for container, c in zip(element.children, self.compiled.cells_list):
             c.render(self, container)
         return element
 
@@ -317,6 +332,7 @@ def move(operation, lc, lr):
 class GridParser(Parser):
     """A layout description parser"""
 
+    STRETCHER = Stretcher
     CELL_TYPES = [Empty, Stretcher, Spacer, Field, RowSpan, Label]
 
     def __init__(self, layout_string):

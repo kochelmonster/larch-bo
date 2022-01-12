@@ -1,7 +1,7 @@
 from datetime import date
 from larch.reactive import Reactive, Cell, rule
 from larch.bo.client.wc.vaadin import vbutton, vinput, vcheckbox, vswitch, vdate, vdialog, styles
-from larch.bo.client.grid import Grid
+from larch.bo.client.grid import Grid, splitter
 from larch.bo.client.browser import start_main
 from larch.bo.client.session import Session
 from larch.bo.client.control import register
@@ -137,11 +137,11 @@ class TimeForPoems(Grid):
         self.context.get("dialog").close()
 
 
-class Frame(Grid):
+class Frame(splitter.MixinSplitter, Grid):
     layout = """
 f1:[.person]{1}       |[.controller]{3}
 f2:[.person]{2}@switch|   "
-[.html]{4}                              |<1>
+[.html]{4}                              |<1t>
 <1>                   |
 """
 
@@ -179,8 +179,6 @@ def main():
 
 
 start_main(main)
-
-
 
 GLOCKE = """
 Fest gemauert in der Erden

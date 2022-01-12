@@ -50,7 +50,6 @@ class Cell:
             r = cls.create_cell(mo)
             r.columns = columns
             return r
-
         return None
 
 
@@ -89,17 +88,12 @@ class Stretcher(Cell):
     stretch = 0
     """stretch factor"""
 
-    moving = False
-    """if True the size of col/row can be changed by the user (splitter control)"""
-
-    def __bool__(self):
-        return False
+    def __init__(self, stretch=0):
+        self.stretch = stretch
 
     @classmethod
     def create_cell(cls, mo):
-        c = cls()
-        c.stretch = float(mo.group(1))
-        return c
+        return cls(float(mo.group(1)))
 
 
 class RowSpan(Cell):
@@ -152,6 +146,8 @@ class AlignedCell(DOMCell):
 class Parser:
     """The base class for a layout description parser, it provides functions
     for parsing cells in columns and rows."""
+
+    STRETCHER = Stretcher
 
     CELL_TYPES = []
     """A list of possible cells types."""
@@ -213,7 +209,7 @@ class Parser:
         raise ValueError('Cannot parse cell', cell_string)
 
     def _is_stretcher(self, cell):
-        return isinstance(cell, (Stretcher, Empty))
+        return isinstance(cell, (self.STRETCHER, Empty))
 
     def _make_stretchers(self, rows):
         # __pragma__("opov")
@@ -224,7 +220,7 @@ class Parser:
         is_last_row_stretcher = all(self._is_stretcher(c) for c in rows[-1].values())
 
         if is_last_row_stretcher:
-            col_stretchers = [c for c in rows[-1].values() if isinstance(c, Stretcher)]
+            col_stretchers = [c for c in rows[-1].values() if isinstance(c, self.STRETCHER)]
             rows.pop()  # remove the stretcher row
         else:
             col_stretchers = []
@@ -233,12 +229,11 @@ class Parser:
 
         # check for row stretchers
         row_stretchers = [r.get(last_col) for r in rows]
-        row_stretchers = [s for s in row_stretchers if isinstance(s, Stretcher)]
+        row_stretchers = [s for s in row_stretchers if isinstance(s, self.STRETCHER)]
 
+        pos = Pointer().rows[0].__state__.delegate_get
+        self.row_stretchers = self._build_stretcher(row_stretchers, self.row_count, pos)
         if row_stretchers:
-            pos = Pointer().rows[0].__state__.delegate_get
-            self.row_stretchers = self._build_stretcher(row_stretchers, self.row_count, pos)
-
             # remove the stretcher columns
             self.column_count -= 1
             for r in rows:
@@ -248,19 +243,12 @@ class Parser:
                 # the last column ist spanned!
                 for c in r.values():
                     c.columns = [c.columns[0], min(c.columns[1], last_col - 1)]
-        else:
-            self.row_stretchers = [0 for i in range(self.row_count)]
 
-        if col_stretchers:
-            pos = Pointer().columns[0].__state__.delegate_get
-            self.column_stretchers = self._build_stretcher(col_stretchers, self.column_count, pos)
-            return True
-        else:
-            self.column_stretchers = [0 for i in range(self.column_count)]
-
+        pos = Pointer().columns[0].__state__.delegate_get
+        self.column_stretchers = self._build_stretcher(col_stretchers, self.column_count, pos)
         # __pragma__("notconv")
         # __pragma__("noopov")
-        return False
+        return bool(col_stretchers)
 
     def _assign_rows(self, rows):
         """assigns rows indices to the cells."""
@@ -313,9 +301,9 @@ class Parser:
             c.at_bottom = c.rows[1] == bottom_row
 
     def _build_stretcher(self, stretchers, size, pos):
-        result = [0 for i in range(size)]
+        result = [self.STRETCHER() for i in range(size)]
         for s in stretchers:
-            result[pos(s)] = s.stretch
+            result[pos(s)] = s
         return result
 
 

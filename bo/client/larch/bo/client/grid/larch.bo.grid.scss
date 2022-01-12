@@ -12,8 +12,24 @@
   border-radius: var(--lbo-border-radius);
   > div {
     padding: var(--lbo-space-xs);
+    overflow: hidden;
     overflow: auto;
+  }
 
+  .appearing, .disappearing {
+    overflow: visible;
+  }
+
+  .h-splitter {
+    transition: opacity 200ms ease-in-out;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: var(--lbo-space-s);
+    background: var(--lbo-contrast-40pct);
+    cursor:row-resize;
+    padding: 0;
   }
 }
 
