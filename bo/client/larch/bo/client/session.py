@@ -46,6 +46,7 @@ class Session(EventHandler):
     """
 
     def __init__(self, root):
+        super().__init__()
         self.tasks = deque()
         self._active_dispatch_id = None
         self._wait_for_tabs = False

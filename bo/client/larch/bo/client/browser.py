@@ -139,7 +139,7 @@ def escape(text):
     return __new__(Option(text)).innerHTML
 
 
-def fire_event(etype, bubbles=False, cancelable=False, detail=None, element=None):
+def fire_event(etype, element=None, detail=None, bubbles=False, cancelable=False):
     if element is None:
         element = document.body
 
@@ -176,3 +176,18 @@ def get_metrics():
         tmp.remove()
 
     return metrics
+
+
+app_state = {}  # __:jsiter
+
+
+def save_state(id_, obj):
+    app_state[id_] = obj
+    if not app_state["__dirty__"]:
+        executer.add(_push_state)
+        app_state["__dirty__"] = True
+
+
+def _push_state():
+    del app_state["__dirty__"]
+    window.btoa(window.JSON.stringify(app_state))

@@ -46,13 +46,14 @@ class EventHandler:
         self.bound_events = []
 
     # __pragma__("tconv")
-    def fire_event(self, etype, bubbles=False, cancelable=False, detail=None, element=None):
-        fire_event(etype, bubbles, cancelable, detail, element)
+    def fire_event(self, etype, element=None, detail=None, bubbles=False, cancelable=False):
+        fire_event(etype, element, detail, bubbles, cancelable)
 
     def handle_event(self, name, listener, capture=False, element=None):
         if element is None:
             element = document.body
         element.addEventListener(name, listener, capture)
+        self.bound_events.append([name, element, listener])
 
     def unlink(self):
         for name, element, listener in self.bound_events:

@@ -101,11 +101,11 @@ Readonly     |[.readonly]@switch
     readonly = Cell(False)
 
 
-class HTMLEditor(Grid):
+class HTMLEditor(splitter.MixinSplitter, Grid):
     layout = """
 Editor               |Preview
 edit:[.content]@multi|preview:[.content]@html|<1>
-<1>                  |<1>
+<1M>                 |<1M>
 """
     content = Cell("""
 <h1>Hello</h1>
@@ -132,6 +132,9 @@ class TimeForPoems(Grid):
         self.poem = GLOCKE
         self.title = "<h3>Das Lied von der Glocke</h3>"
 
+    def modify_controls(self):
+        self.container("poem").classList.add("scrollable")
+
     @label("Like it")
     def like_it(self):
         self.context.get("dialog").close()
@@ -140,8 +143,8 @@ class TimeForPoems(Grid):
 class Frame(splitter.MixinSplitter, Grid):
     layout = """
 f1:[.person]{1}       |[.controller]{3}
-f2:[.person]{2}@switch|   "
-[.html]{4}                              |<1t>
+f2:[.person]{2}@switch|   "             |<1M>
+[.html]{4}                              |<1M>
 <1>                   |
 """
 

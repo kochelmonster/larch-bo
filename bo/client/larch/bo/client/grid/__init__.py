@@ -147,7 +147,7 @@ class Spacer(DOMCell):
 
 
 class Stretcher(PCell):
-    EXPRESSION = re.compile(r"<(\d+)([lrtb]?)>")
+    EXPRESSION = re.compile(r"<(\d+)([mM]?)>")
 
     def __init__(self, stretch=0, splitter=""):
         self.stretch = stretch
