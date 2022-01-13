@@ -1,21 +1,11 @@
 from larch.reactive import rule
-from ..browser import loading_modules, fire_event, save_state
+from ..browser import loading_modules, fire_event
 from ..animate import animator
+from ..js.debounce import debounce
 # __pragma__("skip")
-from larch.bo.packer import parcel
-parcel.NEEDED_PACKAGES.add("lodash.debounce")
-
 console = document = window = loading_modules
 def __pragma__(*args): pass
 # __pragma__ ("noskip")
-
-
-debounce = None
-__pragma__('js', '{}', '''
-loading_modules.push((async () => {
-    debounce = await import('lodash.debounce');
-})());
-''')
 
 
 class Splitter:
@@ -38,7 +28,7 @@ class Splitter:
         self.move_offset = self.calc_move_offset(split_element.getBoundingClientRect())
         """half height/width"""
 
-        stops = self.get_stops().split(" ")
+        stops = self.get_stops()
         self.frs_sum = (window.parseFloat(stops[css_index])
                         + window.parseFloat(stops[css_index+1]))
 
@@ -89,7 +79,7 @@ class Splitter:
 
     def prepare_context(self, context):
         sizes = self.get_calced_stops()
-        context.stops = self.get_stops().split(" ")
+        context.stops = self.get_stops()
 
         min_stops = ["auto" for s in context.stops]
         self.set_stops(min_stops)
@@ -117,8 +107,8 @@ class Splitter:
         pbefore = context.before/(context.before_start+context.after_start)
         frbefore = pbefore * self.frs_sum
         frafter = (1-pbefore) * self.frs_sum
-        context.stops[self.css_index] = "auto" if frbefore < 0.01 else f"{frbefore}fr"
-        context.stops[self.css_index+1] = "auto" if frafter < 0.01 else f"{frafter}fr"
+        context.stops[self.css_index] = f"{frbefore}fr"
+        context.stops[self.css_index+1] = f"{frafter}fr"
         self.set_stops(context.stops)
         return None
 
@@ -126,10 +116,15 @@ class Splitter:
         offset = sum(self.get_calced_stops()[:self.css_index+1])   # __:opov
         self.set_splitter(offset)
 
-    def state(self):
+    def get_state(self):
         stops = self.get_stops()
-        return [window.parseFloat(stops[self.css_index]),
-                window.parseFloat(stops[self.css_index+1])]
+        return [stops[self.css_index], stops[self.css_index+1]]
+
+    def set_state(self, state):
+        stops = self.get_stops()
+        stops[self.css_index] = state[0]
+        stops[self.css_index+1] = state[1]
+        self.set_stops(stops)
 
     def orect(self):
         return self.split_element.parentElement.getBoundingClientRect()
@@ -142,7 +137,7 @@ class Splitter:
         return list(map(window.parseFloat, stops.split(" ")))
 
     def get_stops(self):
-        return self.split_element.parentElement.style[self.STYLE_NAME]
+        return self.split_element.parentElement.style[self.STYLE_NAME].split(" ")
 
     def set_stops(self, stops):
         self.split_element.parentElement.style[self.STYLE_NAME] = " ".join(stops)
@@ -204,8 +199,6 @@ class MixinSplitter:
         self.hide_splitters = debounce(self.hide_splitters, self.HIDE_DELAY)
 
     def create_template(self, parser, compiled):
-        console.log("***create_template", debounce)
-
         compiled.splitters = []
         template = super().create_template(parser, compiled)
 
@@ -229,7 +222,8 @@ class MixinSplitter:
         self.hide_splitters.flush()
 
     def splitter_state_changed(self, event):
-        self.save_splitter_state()
+        window.lbo.state.set(
+            self.context.get("id"), "splitter", [s.get_state() for s in self.splitters])
 
     def create_splitter_template(self):
         return document.createElement("div")
@@ -258,13 +252,16 @@ class MixinSplitter:
         for s in self.splitters:
             s.hide()
 
-    def save_splitter_state(self):
-        obj = {}  # __:jsiter
-        obj.splitters = [s.state() for s in self.splitters]
-        save_state(self.context.get(id), obj)
-
     @rule
     def _rule_init_splitters(self):
         if self.element:
             yield
             self.init_splitters()
+
+    @rule
+    def _rule_update_splitter_state(self):
+        if self.element:
+            yield
+            for state in window.lbo.state.loop(self.context.get("id"), "splitter"):
+                for state, splitter in zip(state, self.splitters):
+                    splitter.set_state(state)

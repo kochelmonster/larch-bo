@@ -35,7 +35,10 @@ Table:
 Heute
     - splitter
     - state save (msgpack/json)
+    - to_object in transmitter
+
     - DB LayoutCache in db implementieren und testen
+    - distracted-davince uptime überprüfen
     - Fuse mit ebdav in sourcen schauen
     - commands
     - animation mit config["debug"] ausschaltbar machen

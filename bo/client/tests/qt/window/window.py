@@ -160,8 +160,8 @@ class Actions(Grid):
 
 
 def main():
-    frame = Actions(ControlContext(session=Session(document.body)))
-    window.session.set_root(frame)
+    frame = Actions()
+    Session(frame).boot()
     window.grid = frame
 
 

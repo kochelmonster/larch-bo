@@ -56,9 +56,22 @@ Accept    |[accept]
     @icon("check")
     @label("Open Dialog")
     def open(self):
+        def done():
+            console.log("***done dialog")
+            window.lbo.state.set("main", "dialog", None)
+
         dialog = vdialog.Dialog(TimeForPoems(), self.context)
-        dialog.modal(self.upload_cancel, style="height: 80%")
+        dialog.modal(done, style="height: 80%")
+        window.lbo.state.set("main", "dialog", True)
         console.log("submit")
+
+    @rule
+    def _rule_update_state(self):
+        if self.element:
+            yield
+            for state in window.lbo.state.loop("main", "dialog"):
+                if state:
+                    self.open()
 
 
 @register(Model, "switch")

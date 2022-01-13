@@ -43,6 +43,8 @@ class FileUploaderControl(Grid):
     def render(self, parent):
         self.update_layout()
         super().render(parent)
+
+    def modify_controls(self):
         self.element.classList.add("lbo-fileuploader")
 
     def update_layout(self):

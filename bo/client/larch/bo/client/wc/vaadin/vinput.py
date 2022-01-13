@@ -32,6 +32,7 @@ class TextControl(MixinLiveTracker, MixinVaadin, MixinStyleObserver, Control):
     def render(self, parent):
         element = document.createElement(self.TAG)
         parent.appendChild(element)
+        element.autocomplete = "nope"
         self.element = element
         label = self.context.get("label-element")
         if label:
@@ -47,7 +48,8 @@ class TextControl(MixinLiveTracker, MixinVaadin, MixinStyleObserver, Control):
 
     def update_styles(self):
         super().update_styles()
-        self.element.autocomplete = self.context.observe("autocomplete") or "nope"
+        for value in self.context.loop("autocomplete"):
+            self.element.autocomplete = value
 
     @rule
     def _rule_value_changed(self):

@@ -25,52 +25,57 @@ class ButtonControl(MixinVaadin, MixinStyleObserver, Control):
         self.element = document.createElement(self.TAG)
         parent.appendChild(self.element)
         self.element.addEventListener("click", self.on_click)
+        self.set_default_label()
+        self.set_default_icons()
+        self.set_default_tooltip()
 
     def on_click(self, event):
         self.context.value()
 
+    def set_default_label(self):
+        label = get_func_prop(self.context.value, "__label__")
+        if label is None:
+            label = self.context.get("name")
+        self.element.innerText = str(label)
+
+    def set_default_icons(self):
+        el = self.element
+
+        icon = get_func_prop(self.context.value, "__icon__")
+        if icon:
+            icon = get_icon(icon)
+            add_slot(el, "prefix" if el.innerText else None, icon)
+
+        icon = get_func_prop(self.context.value, "__ricon__")
+        if icon:
+            icon = get_icon(icon)
+            add_slot(el, "suffix", icon)
+
+    def set_default_tooltip(self):
+        tooltip = get_func_prop(self.context.value, "__tooltip__")
+        if tooltip:
+            self.element.dataset.tooltip = str(tooltip)
+
     def update_styles(self):
         super().update_styles()
         element = self.element
-        label = self.context.observe("label")
-        if not label and not isinstance(label, str):
-            label = get_func_prop(self.context.value, "__label__")
+        for label in self.context.loop("label"):
+            element.innerText = str(label)
 
-            if not label and not isinstance(label, str):
-                label = self.context.observe("name")
+        for icon in self.context.loop("prefix"):
+            add_slot(element, "prefix" if element.innerText else None, icon)
 
-        element.innerText = str(label)
-        icon = self.get_icon("prefix", "__icon__")
-        if icon:
-            add_slot(element, "prefix" if label else None, icon)
-
-        icon = self.get_icon("suffic", "__ricon__")
-        if icon:
+        for icon in self.context.loop("suffix"):
             add_slot(element, "suffix", icon)
 
-        return self.update_tooltip().update_theme()
+        for tooltip in self.context.loop("tooltip"):
+            if tooltip:
+                self.element.dataset.tooltip = str(tooltip)
+            else:
+                __pragma__("js", "{}", "delete self.element.dataset.tooltip;")
 
-    def get_icon(self, slot, alt):
-        icon = self.context.observe(slot)
-        if not icon:
-            icon = get_func_prop(self.context.value, alt)
-        if icon:
-            icon = get_icon(icon)
-        return icon
-
-    def update_tooltip(self):
-        tooltip = self.context.observe("tooltip")
-        if not tooltip:
-            tooltip = get_func_prop(self.context.value, "__tooltip__")
-        if tooltip:
-            self.element.dataset.tooltip = str(tooltip)
-        else:
-            __pragma__("js", "{}", "delete self.element.dataset.tooltip;")
-        return self
-
-    def update_theme(self):
-        theme = self.context.observe("theme") or ""
-        self.element.setAttribute("theme", theme)
+        for theme in self.context.loop("theme"):
+            self.element.setAttribute("theme", theme)
 
 
 def register(style=""):

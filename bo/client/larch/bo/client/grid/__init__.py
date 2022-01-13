@@ -296,24 +296,24 @@ class Grid(Control):
         return elements
 
     @rule
-    def _rule_update_cells(self):
-        if self.context:
-            self.layout
-            yield
-            if self.element:
-                parent = self.element.parentElement
-                parent.innerHTML = ""
-                self.render_to_dom(parent)
-                self.modify_controls()
+    def _rule_layout_changed(self):
+        self.layout
+        yield
+        if self.element:
+            parent = self.element.parentElement
+            parent.innerHTML = ""
+            self.element = self.render_to_dom(parent)
+            self.modify_controls()
 
     @rule
     def _rule_disabled(self):
         el = self.element
         if el:
-            if self.context.observe("disabled"):
-                el.classList.add("disabled")
-            else:
-                el.classList.remove("disabled")
+            for value in self.context.loop("disabled"):
+                if value:
+                    el.classList.add("disabled")
+                else:
+                    el.classList.remove("disabled")
 
 
 def move(operation, lc, lr):

@@ -1,3 +1,8 @@
+# __pragma__("skip")
+js_undefined = None
+# __pragma__("noskip")
+
+
 def label(prop):
     def wrapped(func):
         func.__label__ = prop
@@ -41,4 +46,5 @@ def keys(prop):
 
 
 def get_func_prop(func, id_):
-    return func[id_]
+    result = func[id_]
+    return None if result is js_undefined else result

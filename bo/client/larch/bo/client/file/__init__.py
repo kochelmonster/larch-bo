@@ -1,25 +1,15 @@
 """file transfer functions"""
 from time import time
 from larch.reactive import Reactive, Cell
-from ..browser import executer, create_promise, loading_modules
+from ..browser import executer, loading_modules
 from ..i18n import pgettext
+from ..js.uuid import uuid
 
 # __pragma__("skip")
-
-from larch.bo.packer import parcel
-parcel.NEEDED_PACKAGES.add("uuid")
-FileReader = console = document = window = loading_modules
+Promise = FileReader = console = document = window = loading_modules
 def __pragma__(*args): pass
 def __new__(a): pass
 # __pragma__("noskip")
-
-
-uuidv4 = None
-__pragma__('js', '{}', '''
-loading_modules.push((async () => {
-    uuidv4 = await import('uuid');
-})());
-''')
 
 
 CHUNK_SIZE = 32*1024
@@ -35,7 +25,7 @@ class FileItem(Reactive):
         self.start = 0
         self.ofile = ofile
         self.uploader = uploader
-        self.id = uuidv4()
+        self.id = uuid()
         self.request = None
         self.uploaded_bytes = 0
 
@@ -64,7 +54,7 @@ class FileItem(Reactive):
                 self.start = time()
             self.uploaded_bytes += event.target.result.byteLength
             if self.request is None:
-                self.request = window.transmitter.put_start(
+                self.request = window.lbo.transmitter.put_start(
                     "file_upload", event.target.result, id_=self.id)
                 self.request.then(self._check_upload_state, self._error_upload).receive(
                     self._commited_upload)
@@ -72,7 +62,6 @@ class FileItem(Reactive):
                 self.request.put(event.target.result)
 
     def abort(self, status="aborted", msg=None):
-        console.log("**abort", repr(self))
         if self.status == "active":
             if msg is None:
                 self.error = str(pgettext("file", "Aborted"))
@@ -139,7 +128,7 @@ class FileUploader(Reactive):
         controller.click()
         controller.remove()
         controller.onchange = lambda event: self.start_upload(event.target.files)
-        return create_promise(self._set_start_callback)
+        return __new__(Promise(self._set_start_callback))
 
     def _set_start_callback(self, resolve):
         self._start_callback = resolve
@@ -172,7 +161,7 @@ class FileUploader(Reactive):
         self.file_reader = __new__(FileReader())
         self.file_reader.onload = self._upload_chunk
         self.file_reader.onerror = self._error
-        window.session.extern.file_upload_start(
+        window.lbo.server.file_upload_start(
             self.destination, [f.pack() for f in self.files], self.accept).then(
                 self._accept, self.abort)
 

@@ -26,30 +26,10 @@ if __name__ == "__main__":
 # ---------------------------------------------------
 # __pragma__ ("noskip")
 
+# __pragma__ ("jsiter")
+obj = {"a": 1, "b": 2, "c": {"a": 1}}
+a = []
 
-class Mixin:
-    def plugin(self, call_order):
-        call_order.append("Mixin")
-        super().plugin(call_order)
-
-class Base:
-    def __init__(self, call_order):
-        call_order.append("Base")
-
-    def plugin(self, call_order):
-        call_order.append("Base")
-
-class Child(Mixin, Base):
-    pass
-
-class GrandChild(Child):
-    pass
-
-
-call_order = []
-mixed = GrandChild(call_order)
-console.log("call_order1", call_order)
-
-call_order = []
-mixed.plugin(call_order)
-console.log("call_order1", call_order)
+for k in obj:
+    # __pragma__ ("nojsiter")
+    console.log("item", k, obj[k], type(obj[k]).__name__, type(obj[k]) == object)

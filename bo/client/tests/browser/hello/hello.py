@@ -66,10 +66,7 @@ class Hello(Grid):
 
 
 def main():
-    frame = Frame()
-    frame.context.set("session", Session())
-    window.session.set_root(frame)
-    window.grid = frame.content
+    Session(Frame()).boot()
 
 
 start_main(main)

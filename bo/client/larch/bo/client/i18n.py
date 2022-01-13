@@ -7,12 +7,13 @@ class Mock:
 
 
 document = console = Intl = window = navigator = Date = Mock()
+window.lbo = Mock()
 def require(n): pass
 def __new__(*args): pass
 # __pragma__ ("noskip")
 
 
-window.translations = {}
+window.lbo.translations = {}
 
 
 def get_lang(element=None):
@@ -25,7 +26,7 @@ def get_lang(element=None):
 
 def translate(key, prefix):
     lang = get_lang(document.body)
-    table = window.translations.get(lang, {})
+    table = window.lbo.translations.get(lang, {})
     return table.get(prefix+key, key)
 
 

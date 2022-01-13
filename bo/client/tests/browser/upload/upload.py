@@ -116,7 +116,7 @@ files:[.context.value]@content|<1>
     def _rule_change_label(self):
         if self.element and not self.context.value.active_count:
             if self.context.get("dialog").element.opened:
-                self.contexts["abort_all"].set("label", "Close").control.update()
+                self.contexts["abort_all"].set("label", "Close")
 
 
 @register(list, "files")
@@ -177,6 +177,9 @@ class Actions(Grid):
     def prepare_contexts(self):
         console.log("prepare context")
         self.contexts["dialog"].set("prefix", "error")
+
+    def modify_controls(self):
+        self.container("files").classList.add("scrollable")
 
     def open_window(self):
         window.open(location.href, "_blank", "width=200,height=400,modal=yes")

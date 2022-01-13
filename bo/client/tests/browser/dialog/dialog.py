@@ -100,9 +100,7 @@ class Actions(Grid):
 
 
 def main():
-    frame = Actions(ControlContext(session=Session()))
-    window.session.set_root(frame)
-    window.grid = frame.content
+    Session(Actions()).boot()
 
 
 start_main(main)

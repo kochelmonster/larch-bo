@@ -1,6 +1,6 @@
 """larch browser objects Rendering engine"""
 import larch.lib.adapter as adapter
-from larch.reactive import Pointer, Reactive, Cell, rule, untouched, rcontext
+from larch.reactive import Pointer, Reactive, Cell, rule, untouched, rcontext, atomic
 from .browser import fire_event
 
 
@@ -38,7 +38,7 @@ def register(type, style=""):
     return wrap
 
 
-class EventHandler:
+class MixinEventHandler:
     """Mixin for Control"""
 
     def __init__(self, *args):
@@ -51,7 +51,7 @@ class EventHandler:
 
     def handle_event(self, name, listener, capture=False, element=None):
         if element is None:
-            element = document.body
+            element = document
         element.addEventListener(name, listener, capture)
         self.bound_events.append([name, element, listener])
 
@@ -60,6 +60,10 @@ class EventHandler:
             element.removeEvent(name, listener)
         super().unlink()
     # __pragma__("notconv")
+
+
+class MixinStateHandler:
+    pass
 
 
 class Control(Reactive):
@@ -122,9 +126,72 @@ class TextControl(HTMLControl):
             self.element.innerText = self.context.value
 
 
-class ControlContext(Reactive):
-    _value = Cell()
+class OptionManager(Reactive):
     _observed_changed = Cell(0)
+    _last_reactive_round = 0
+
+    def __init__(self):
+        self.parent = None
+        self.options = {}
+        self.observed = {}   # __:jsiter
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__} {self.options}>"
+
+    # __pragma__ ('jscall')
+    def observe(self, name):
+        if rcontext.inside_rule:
+            # transform to container
+            self._observed_changed   # touch
+            self.observed[name] = -1
+            value = self.options.get(name)
+            if value is None and self.parent is not None:
+                return self.parent.observe(name)
+            return value
+        return self.get(name)
+
+    def loop(self, name):
+        """like observer but is a genrator that only yields if the value has changed"""
+        if rcontext.inside_rule:
+            # transform to container
+            self._observed_changed   # touch
+            value = self.options.get(name)
+            if value is None and self.parent is not None:
+                self.observed[name] = -1
+                return self.parent.loop(name)
+            else:
+                if name in self.observed:
+                    if value is not None and self.observed[name] >= self._last_reactive_round:
+                        # the value has changed
+                        return [value]
+                else:
+                    # the first time called
+                    self.observed[name] = -1
+                    if value is not None:
+                        return [value]
+            return []
+
+        value = self.get(name)
+        return [value] if value is not None else []
+
+    def get(self, name):
+        value = self.options.get(name)
+        if value is None and self.parent is not None:
+            return self.parent.get(name)
+        return value
+
+    def set(self, name, value):
+        self.options[name] = value
+        if name in self.observed:
+            with atomic(), untouched():
+                self.observed[name] = self._last_reactive_round = rcontext.rounds
+                self._observed_changed += 1
+        return self
+    # __pragma__ ('nojscall')
+
+
+class ControlContext(OptionManager):
+    _value = Cell()
 
     # __pragma__ ('kwargs')
     def __init__(self, value=None, parent=None, **kwargs):
@@ -133,7 +200,6 @@ class ControlContext(Reactive):
         self.parent = parent
         self.options = kwargs
         self.options.setdefault("style", "")  # never bubble style
-        self.observed = {}   # __:jsiter
     # __pragma__ ('nokwargs')
 
     # __pragma__ ('jscall')
@@ -157,33 +223,6 @@ class ControlContext(Reactive):
         if isinstance(v, Pointer):
             return v
         return Pointer(v)
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__} {self.options}>"
-
-    def observe(self, name):
-        if rcontext.inside_rule:
-            # transform to container
-            self._observed_changed   # touch
-            self.observed[name] = True
-
-        value = self.options.get(name)
-        if value is None and self.parent is not None:
-            return self.parent.observe(name)
-        return value
-
-    def get(self, name):
-        value = self.options.get(name)
-        if value is None and self.parent is not None:
-            return self.parent.get(name)
-        return value
-
-    def set(self, name, value):
-        self.options[name] = value
-        if name in self.observed:
-            with untouched():  # if called in a rule
-                self._observed_changed += 1
-        return self
     # __pragma__ ('nojscall')
 
 

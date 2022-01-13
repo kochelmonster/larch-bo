@@ -1,7 +1,6 @@
 from collections import deque
-from larch.reactive import Reactive, Cell, rule
 # __pragma__("skip")
-document = window = Object = Option =  None
+document = window = Object = Option = Promise = None
 def __pragma__(*args): pass
 def __new__(p): pass
 # __pragma__("noskip")
@@ -9,8 +8,9 @@ def __new__(p): pass
 
 loading_modules = []  # to avoid controls have to reference session
 
-
 __pragma__('js', '{}', '''
+window.lbo = {}   // globals for larch browser objects
+
 loading_modules.push(new Promise((resolve) => {
     document.addEventListener('DOMContentLoaded', resolve);
 }));
@@ -48,12 +48,6 @@ def start_main(main_func):
         Promise.all(loading_modules).then(() => {
             _browser_ready(main_func)
         });
-    ''')
-
-
-def create_promise(callback):
-    __pragma__('js', '{}', '''
-    return new Promise(callback);
     ''')
 
 
@@ -141,7 +135,7 @@ def escape(text):
 
 def fire_event(etype, element=None, detail=None, bubbles=False, cancelable=False):
     if element is None:
-        element = document.body
+        element = document
 
     __pragma__('js', '{}', '''
         var options = {
@@ -178,16 +172,14 @@ def get_metrics():
     return metrics
 
 
-app_state = {}  # __:jsiter
+class PyPromise:
+    def __init__(self):
+        self.promise = __new__(Promise(self.set_handlers))
 
+    def set_handlers(self, resolve, reject):
+        self.resolve = resolve
+        self.reject = reject
 
-def save_state(id_, obj):
-    app_state[id_] = obj
-    if not app_state["__dirty__"]:
-        executer.add(_push_state)
-        app_state["__dirty__"] = True
-
-
-def _push_state():
-    del app_state["__dirty__"]
-    window.btoa(window.JSON.stringify(app_state))
+    def then(self, resolve, reject):
+        self.promise.then(resolve, reject)
+        return self

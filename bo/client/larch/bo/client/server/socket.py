@@ -21,7 +21,28 @@ msgpack = require("msgpack-lite")
 
 __pragma__('js', '{}', '''
 self.onmessage = function(e) {
-    send_request(e.data);
+    var request = e.data;
+    switch(request.action) {
+     case "encode":
+        request.action = "result";
+        request.result = msgpack.encode(request.data);
+        delete request.data
+        postMessage(request);
+        return;
+
+     case "decode":
+         try {
+            request.result = msgpack.decode(request.data);
+            request.action = "result";
+         } catch (exc) {
+            request.action = "error";
+            request.error = exc.toString();
+         }
+         delete request.data
+         postMessage(request);
+         return;
+    }
+    send_request(request);
 }
 
 function create_websocket(url) {
@@ -47,7 +68,6 @@ function feed(data) {
 
 
 def obj_receive(obj):
-    # console.log("receive obj", obj)
     postMessage(obj)
 
 

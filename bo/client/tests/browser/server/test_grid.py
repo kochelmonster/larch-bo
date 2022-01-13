@@ -118,8 +118,7 @@ lvalue:Value{r}|[.value]{l}
 
         self.show("from_server", False)
         self.show("abort")
-        session = self.context.get("session")
-        self.request = session.extern.get_data(10).receive(receive).then(result, error)
+        self.request = window.bo.server.get_data(10).receive(receive).then(result, error)
 
     def abort(self):
         self.request.abort()
@@ -163,15 +162,10 @@ def adjust_size():
 
 def main():
     print("start main")
-    root_container = create_window_container(document.body)
 
-    frame = Frame()
-    print("--build frame")
-    frame.context.set("session", Session(root_container))
-    print("--set session")
-    window.session.set_root(frame)
-    window.grid = frame.content
-    document.body.addEventListener("tabindex-done", tabs_changed)
+    session = Session(Frame()).boot()
+    window.grid = session.root.content
+    document.addEventListener("tabindex-done", tabs_changed)
     window.addEventListener("qtready", adjust_size)
     console.log("main ready")
 
