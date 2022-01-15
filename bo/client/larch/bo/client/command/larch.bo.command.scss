@@ -1,0 +1,30 @@
+#lbo-keystrokes {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  z-index: 1000;
+  box-sizing: border-box;
+  background: var(--lbo-base-color, "white");
+  border-top: 1px solid var(--lbo-contrast-20pct, hsla(214, 57%, 24%, 0.1));
+  padding: var(--lbo-space-s, 0.5rem);
+  transition: padding-top 200ms linear;
+  transition: padding-bottom 200ms linear;
+  overflow: hidden;
+  &.hidden {
+    z-index: -1;
+    height: 0;
+    padding: 0;
+    border-top-width: 0;
+  }
+
+
+}
+
+.lbo-keystroke {
+  border: 1px solid var(--lbo-contrast-20pct, hsla(214, 57%, 24%, 0.1));
+  background: var(--lbo-contrast-10pct, hsla(214, 57%, 24%, 0.1));
+  border-radius: var(--lbo-border-radius-m, 0.25em);
+  margin: var(--lbo-space-xs, 0.25rem);
+  padding: var(--lbo-space-xs, 0.25rem);
+}

@@ -27,7 +27,7 @@ class Dialog:
     # __pragma__ ('kwargs')
     def __init__(self, value, parent=None, **kwargs):
         self.context = DialogContentContext(value, parent, dialog=self, **kwargs)
-        self.result_callback = None
+        self.result_callback = self.last_active = None
     # __pragma__ ('nokwargs')
 
     @property
@@ -40,6 +40,7 @@ class Dialog:
 
     # __pragma__("kwargs")
     def modal(self, result_callback, style=None, klass=None, **kwargs):
+        self.last_active = document.activeElement
         self.result_callback = result_callback
         dialog = document.createElement(self.TAG)
         dialog.renderer = self._render_into_dialog
@@ -66,6 +67,9 @@ class Dialog:
             if self.result_callback:
                 self.result_callback(self)
             self.element.remove()
+            if self.last_active:
+                self.last_active.focus()
+                self.last_active = None
 
     def _render_into_dialog(self, root, dialog):
         root.innerHTML = ""

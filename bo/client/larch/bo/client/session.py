@@ -179,7 +179,6 @@ class Session:
         """starts rendering"""
         if container is None:
             container = document.body
-        container.innerHTML = ""
 
         document.addEventListener("new-tabs", self._update_tabindex)
         if self.transmitter:

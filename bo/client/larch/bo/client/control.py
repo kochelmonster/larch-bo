@@ -62,10 +62,6 @@ class MixinEventHandler:
     # __pragma__("notconv")
 
 
-class MixinStateHandler:
-    pass
-
-
 class Control(Reactive):
     def __init__(self, context_or_value=None):
         super().__init__()

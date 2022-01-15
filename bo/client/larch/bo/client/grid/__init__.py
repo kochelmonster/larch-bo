@@ -115,7 +115,9 @@ class Field(AlignedCell):
         return FieldContext(pointer, grid.context, self)
 
     def render(self, grid, element):
-        grid.contexts[self.name].container = element
+        context = grid.contexts[self.name]
+        element.id = context.get("id")
+        context.container = element
 
 
 class Spacer(DOMCell):
@@ -301,7 +303,6 @@ class Grid(Control):
         yield
         if self.element:
             parent = self.element.parentElement
-            parent.innerHTML = ""
             self.element = self.render_to_dom(parent)
             self.modify_controls()
 

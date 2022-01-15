@@ -12,11 +12,14 @@ html {
   --lbo-primary-text-color: var(--lumo-primary-text-color);
   --lbo-secondary-text-color: var(--lumo-secondary-text-color);
 
-  --lbo-border-radius: var(--lumo-border-radius-m);
+
+  --lbo-border-radius-l: var(--lumo-border-radius-l);
+  --lbo-border-radius-m: var(--lumo-border-radius-m);
   --lbo-space-xs: var(--lumo-space-xs);
   --lbo-space-s: var(--lumo-space-s);
   --lbo-error-text-color: var(--lumo-error-text-color);
 
+  --lbo-contrast-10pct: var(--lumo-contrast-10pct);  // input background
   --lbo-contrast-20pct: var(--lumo-contrast-20pct);  // border color
   --lbo-contrast-40pct: var(--lumo-contrast-40pct);
 

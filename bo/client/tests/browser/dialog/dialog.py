@@ -4,7 +4,6 @@ from larch.bo.client.vaadin import vinput, vbutton, vdialog
 from larch.bo.client.grid import Grid
 from larch.bo.client.grid.snippets import OkCancel
 from larch.bo.client.command import label
-from larch.bo.client.control import ControlContext
 from larch.bo.client.session import Session
 from larch.bo.client.browser import start_main
 # __pragma__("skip")
@@ -33,9 +32,6 @@ if __name__ == "__main__":
 
 vbutton.register()
 vinput.register()
-
-
-clas
 
 
 class Hello(Grid):
