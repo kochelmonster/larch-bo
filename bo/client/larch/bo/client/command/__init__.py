@@ -175,23 +175,21 @@ class CommandManager:
         for element in event.path:
             if element.lbo_commands:
                 if self.execute_command(element, event, detected_keys, 0):
-                    stop_event(event)
                     return
 
         for element in document.querySelectorAll(".lbo-commands"):
             if element.lbo_commands:
                 if self.execute_command(element, event, detected_keys, 1):
-                    stop_event(event)
                     return
 
         self.stop_key_sequence()
 
-    def execute_command(self, element, event, detected_keys, global_command):
+    def execute_command(self, element, event, detected_keys, only_globals):
         # __pragma__("jsiter")
         for c in element.lbo_commands:
             # __pragma__("nojsiter")
             func = element.lbo_commands[c]
-            if int(bool(func.__command_is_global__)) < global_command:
+            if int(bool(func.__command_is_global__)) < only_globals:
                 continue
 
             for command_key in (func.__key__ or "").split(","):
@@ -201,13 +199,15 @@ class CommandManager:
                     if command_key.startswith(dk):
                         if command_key == dk:
                             self.stop_key_sequence()
-                            window.lbo.command_event = event
-                            func()
-                            window.lbo.command_event = None
+                            window.lbo.command_context = {"event": event}  # __:jsiter
+                            if func() is not False:
+                                stop_event(event)
+                            window.lbo.command_context = None
                             return True
                         else:
                             # a key sequence
                             self.start_key_sequence(dk)
+                            stop_event(event)
                             return True
 
     def event_to_key(self, event):
@@ -275,70 +275,6 @@ class CommandManager:
                 detected_keys[self.active_key_sequence+shifted] = True
 
         return detected_keys
-
-
-class MiniBuffer:
-    """Enter commands from a minibuffer line like emacs"""
-    TIMER_DELTA = 50
-
-    def __init__(self):
-        self.current_target = None
-        self.minibuffer_div = self.create_minibuffer_div()
-        self.input = self.minibuffer_div.querySelector("input")
-
-    @command(global_=True, key="alt+x")
-    def show_minibuffer(self):
-        self.current_target = window.lbo.command_event.target
-        self.collect_commands(window.lbo.command_event)
-        self.minibuffer_div.classList.remove("hidden")
-        self.old_value = self.input.value = ""
-        self.input.focus()
-        self.timer_id = setInterval(self._poll, self.TIMER_DELTA)
-
-    @command(key="ctrl+g")
-    def hide_minibuffer(self):
-        self.minibuffer_div.classList.add("hidden")
-        if self.current_target:
-            self.current_target.focus()
-            self.current_target = None
-        clearInterval(self.timer_id)
-
-    @command(key="tab")
-    def show_completion(self):
-        pass
-
-    def create_minibuffer_div(self):
-        div = document.createElement("div")
-        div.id = "lbo-minibuffer"
-        input_ = document.createElement("input")
-        div.appendChild(input_)
-        return div
-
-    def render(self, parent):
-        parent.appendChild(self.minibuffer_div)
-        return self
-
-    def _poll(self):
-        value = self.input.value()
-        if value != self.old_value:
-            pass
-
-    def collect_commands(self, event):
-        self.active_commands = {}   # __:jsiter
-
-        for element in document.querySelectorAll(".lbo-commands"):
-            self.collect_commands_from_element(element, self.active_commands)
-
-        for element in event.path:
-            self.collect_commands_from_element(element, self.active_commands)
-
-    def collect_commands_from_element(self, element, result):
-        if element.lbo_commands:
-            # __pragma__("jsiter")
-            for id_ in element.lbo_commands:
-                # __pragma__("nojsiter")
-                if not id_.startswith("-"):
-                    result[id_] = element.lbo_commands[id_]
 
 
 def make_command_manager():

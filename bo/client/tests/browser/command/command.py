@@ -1,5 +1,5 @@
 # import larch.lib.adapter as adapter
-from larch.bo.client.command import command, CommandHandler
+from larch.bo.client.command import command, CommandHandler, mb
 from larch.bo.client.browser import start_main
 # __pragma__("skip")
 # ---------------------------------------------------
@@ -80,9 +80,14 @@ class CommandTest(CommandHandler):
     def show_menu(self):
         self.output.innerText += "show_menu called\n"
 
+    @command(global_=True, key="ctrl+k ctrl+f")
+    def focus(self):
+        self.input1.element.focus()
+
 
 def main():
     window.command_test = CommandTest().render(document.body)
+    mb.MiniBuffer().render(document.body)
 
 
 start_main(main)

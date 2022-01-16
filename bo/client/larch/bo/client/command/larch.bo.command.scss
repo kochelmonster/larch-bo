@@ -1,24 +1,35 @@
-#lbo-keystrokes {
+@mixin animated {
+  transition: padding-top 200ms linear;
+  transition: padding-bottom 200ms linear;
+}
+
+@mixin bottom {
   position: fixed;
-  left: 0;
   bottom: 0;
+  left: 0;
   width: 100%;
   z-index: 1000;
   box-sizing: border-box;
   background: var(--lbo-base-color, "white");
   border-top: 1px solid var(--lbo-contrast-20pct, hsla(214, 57%, 24%, 0.1));
   padding: var(--lbo-space-s, 0.5rem);
-  transition: padding-top 200ms linear;
-  transition: padding-bottom 200ms linear;
+  font-size: var(--lbo-font-size-m, 1rem);
   overflow: hidden;
+
   &.hidden {
     z-index: -1;
     height: 0;
     padding: 0;
     border-top-width: 0;
+    overflow: hidden;
+    bottom: 50000px;
   }
+}
 
 
+#lbo-keystrokes {
+  @include bottom;
+  @include animated;
 }
 
 .lbo-keystroke {
@@ -27,4 +38,38 @@
   border-radius: var(--lbo-border-radius-m, 0.25em);
   margin: var(--lbo-space-xs, 0.25rem);
   padding: var(--lbo-space-xs, 0.25rem);
+}
+
+#lbo-minibuffer {
+  @include bottom;
+  @include animated;
+  display: flex;
+  label {
+    padding-right: var(--lbo-space-xs, 0.25rem);
+  }
+  input {
+    border: none;
+    flex-grow: 1;
+    background: none;
+    padding: none;
+    outline: none;
+    &:focus-visible {
+      outline: none;
+      border: none;
+    }
+  }
+}
+
+#lbo-minibuffer-choice {
+  @include bottom;
+  display: grid;
+  width: auto;
+  bottom: auto;
+  grid-auto-flow: row;
+  grid-template-columns: auto;
+  > div {
+    padding: var(--lbo-space-xs, 0.25rem);
+    white-space: nowrap;
+    cursor: pointer;
+  }
 }
