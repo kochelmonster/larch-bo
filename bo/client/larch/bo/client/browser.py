@@ -183,3 +183,16 @@ class PyPromise:
     def then(self, resolve, reject):
         self.promise.then(resolve, reject)
         return self
+
+
+js_date = None
+
+__pragma__('js', '{}', '''
+js_date = function js_date(val) {
+    return new Date(val);
+}
+
+Date.prototype.__class__ = js_date;
+js_date.__name__ = "js_date";
+js_date.__bases__ = [object];
+''')

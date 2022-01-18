@@ -1,4 +1,5 @@
-from .browser import get_bubble_attribute
+import larch.lib.adapter as adapter
+from .browser import get_bubble_attribute, js_date
 
 
 # __pragma__("skip")
@@ -11,6 +12,11 @@ window.lbo = Mock()
 def require(n): pass
 def __new__(*args): pass
 # __pragma__ ("noskip")
+
+
+class HTML:
+    """Used for adapters to register type to html converters"""
+    pass
 
 
 window.lbo.translations = {}
@@ -99,9 +105,18 @@ ngettext = Plural
 npgettext = ContextPlural
 
 
-def create_number_formatter(style, element=None):
+def create_number_formatter(style=None, element=None):
     lang = get_lang(element)
+    if style is None:
+        style = {"notation": "standard", "maximumFractionDigits": 2}  # __:jsiter
     return __new__(Intl.NumberFormat(lang, style)).format
+
+
+def create_date_formatter(style=None, element=None):
+    lang = get_lang(element)
+    if style is None:
+        style = {"month": "2-digit", "day": "2-digit", "year": "numeric"}  # __:jsiter
+    return __new__(Intl.DateTimeFormat(lang, style)).format
 
 
 def get_month_names(locale, style):
@@ -148,3 +163,7 @@ def get_date_pattern(locale, style):
 
 def get_first_day_of_week(locale):
     return 0
+
+
+adapter.register(float, HTML, "", create_number_formatter)
+adapter.register(js_date, HTML, "", create_date_formatter)
