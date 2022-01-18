@@ -4,6 +4,7 @@
   justify-content: start;
   align-content: start;
   overflow: hidden;
+  touch-action: none;
   label {
     align-self: center;
     color: var(--lbo-secondary-text-color);
@@ -27,23 +28,29 @@
     position: absolute;
     left: 0;
     right: 0;
-    height: var(--lbo-space-xs);
-    background: var(--lbo-contrast-40pct);
-    cursor:row-resize;
-    padding: 0;
+    padding: var(--lbo-space-s) 0;
+    cursor: row-resize;
+    > div {
+      padding: 0;
+      height: var(--lbo-space-xs);
+      background: var(--lbo-contrast-40pct);
+    }
   }
 
   .v-splitter {
     position: absolute;
     top: 0;
     bottom: 0;
-    width: var(--lbo-space-xs);
-    background: var(--lbo-contrast-40pct);
-    cursor:col-resize;
-    padding: 0;
+    padding: 0 var(--lbo-space-s);
+    cursor: col-resize;
+    > div {
+      padding: 0;
+      height: 100%;
+      width: var(--lbo-space-xs);
+      background: var(--lbo-contrast-40pct);
+    }
   }
 }
-
 
 .lbo-grid.disabled {
   label {

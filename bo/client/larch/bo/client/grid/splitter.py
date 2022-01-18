@@ -3,7 +3,7 @@ from ..browser import loading_modules, fire_event
 from ..animate import animator
 from ..js.debounce import debounce
 # __pragma__("skip")
-console = document = window = loading_modules
+console = document = window = __new__ = ResizeObserver = loading_modules
 def __pragma__(*args): pass
 # __pragma__ ("noskip")
 
@@ -32,7 +32,7 @@ class Splitter:
         self.frs_sum = (window.parseFloat(stops[css_index])
                         + window.parseFloat(stops[css_index+1]))
 
-        split_element.addEventListener("mousedown", self.on_mousedown)
+        split_element.addEventListener("pointerdown", self.on_mousedown)
         split_element.style.display = "none"
 
     @classmethod
@@ -43,7 +43,7 @@ class Splitter:
         template.appendChild(splitter_template)
 
     def on_mousedown(self, event):
-        if event.button == 0:
+        if event.button == 0 and event.buttons:
             self.drag_context = {}  # __:jsiter
             self.drag_context.drag_start = self.drag_pos(event)
             self.drag_context.user_select = document.body.style.userSelect
@@ -51,24 +51,30 @@ class Splitter:
             document.body.style.cursor = window.getComputedStyle(self.split_element).cursor
             document.body.style.userSelect = "none"
             self.prepare_context(self.drag_context)
-            document.addEventListener("mousemove", self.on_mousemove)
-            document.addEventListener("mouseup", self.on_mouseup)
+            document.body.setPointerCapture(event.pointerId)
+            document.addEventListener("pointermove", self.on_mousemove)
+            document.addEventListener("pointerup", self.on_mouseup)
+            document.addEventListener("pointercancel", self.on_mouseup)
+            event.preventDefault()
 
     def on_mousemove(self, event):
-        # console.log("mouse move", event)
         if self.drag_start is not None and event.buttons:
             self.update_grid(self.drag_pos(event), self.drag_context)
             self.update_position()
+            event.preventDefault()
         else:
             self.on_mouseup(event)
 
     def on_mouseup(self, event):
-        document.removeEventListener("mousemove", self.on_mousemove)
-        document.removeEventListener("mouseup", self.on_mouseup)
+        document.body.releasePointerCapture(event.pointerId)
+        document.removeEventListener("pointermove", self.on_mousemove)
+        document.removeEventListener("pointerup", self.on_mouseup)
+        document.removeEventListener("pointercancel", self.on_mouseup)
         document.body.style.userSelect = self.drag_context.user_select
         document.body.style.cursor = self.drag_context.cursor_style
         self.drag_context = self.finish_context(self.drag_context)
         fire_event("state-changed", self.split_element.parentElement, self.index)
+        event.preventDefault()
 
     def show(self):
         animator.show(self.split_element, True)
@@ -86,8 +92,6 @@ class Splitter:
         context.min_sizes = self.get_calced_stops()
         self.set_stops(context.stops)
 
-        free_space = self.get_parent_size() - sum(context.min_sizes)
-        context.usable_space = free_space * self.usable_space_part
         context.before = context.before_start = sizes[self.css_index]
         context.after = context.after_start = sizes[self.css_index+1]
         context.min_before = context.min_sizes[self.css_index]
@@ -189,7 +193,7 @@ class MixinSplitter:
     """
     A Mixin for grid, to support splitter.
     """
-    HIDE_DELAY = 1000   # ms: hide splitters after this time
+    HIDE_DELAY = 2000   # ms: hide splitters after this time
     ColSplitter = ColSplitter
     RowSplitter = RowSplitter
 
@@ -213,11 +217,12 @@ class MixinSplitter:
         return template
 
     def unlink(self):
+        window.removeEventListener("pointermove", self.on_show_splitters)
+        window.removeEventListener("touchdown", self.on_show_splitters)
+        self.resize_observer.unobserve(self.element)
         super().unlink()
-        window.removeEventListener("resize", self._splitter_on_resize)
-        window.removeEventListener("mousemove", self.on_show_splitters)
 
-    def _splitter_on_resize(self, event):
+    def _on_splitter_resize(self, entries):
         self.hide_splitters()
         self.hide_splitters.flush()
 
@@ -226,7 +231,9 @@ class MixinSplitter:
             self.context.get("id"), "splitter", [s.get_state() for s in self.splitters])
 
     def create_splitter_template(self):
-        return document.createElement("div")
+        outer = document.createElement("div")
+        outer.appendChild(document.createElement("div"))
+        return outer
 
     def init_splitters(self):
         if len(self.compiled.splitters):
@@ -235,12 +242,13 @@ class MixinSplitter:
             for i, (cls_name, stop_index, el_index) in enumerate(self.compiled.splitters):
                 factory = getattr(self, cls_name)
                 self.splitters.append(factory(i, stop_index, children[el_index]))
-            window.addEventListener("mousemove", self.on_show_splitters)
-            window.addEventListener("resize", self._splitter_on_resize)
+            window.addEventListener("pointermove", self.on_show_splitters)
+            window.addEventListener("touchdown", self.on_show_splitters)
             self.element.addEventListener("state-changed", self.splitter_state_changed)
+            self.resize_observer = __new__(ResizeObserver(self._on_splitter_resize))
+            self.resize_observer.observe(self.element)
 
     def on_show_splitters(self, event):
-        # console.log("show splitters", event)
         if not self._splitters_visible:
             self._splitters_visible = True
             for s in self.splitters:
