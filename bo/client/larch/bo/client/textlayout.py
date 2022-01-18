@@ -52,6 +52,9 @@ class Cell:
             return r
         return None
 
+    def set_rows(self, rows):
+        self.rows = rows
+
 
 class DOMCell(Cell):
     """A cell rendering an html cell, must be mixed in with a DIVCell Mixin."""
@@ -254,14 +257,14 @@ class Parser:
         """assigns rows indices to the cells."""
         for r, cells in enumerate(rows):
             for c in cells.values():
-                c.rows = [r, r]
+                c.set_rows([r, r])
 
         row_spans = {}
         for cells in reversed(rows):
             for col, rs in row_spans.items():
                 c = cells.get(col)
                 if c is not None:
-                    c.rows = [c.rows[0], rs.rows[1]]
+                    c.set_rows([c.rows[0], rs.rows[1]])
                 else:
                     raise ValueError('wrong row span', rs.columns[0], rs.rows[0])
 

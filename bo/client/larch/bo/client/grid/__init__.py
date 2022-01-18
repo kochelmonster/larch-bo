@@ -134,6 +134,10 @@ class Spacer(DOMCell):
         tmp.height = h
         return tmp
 
+    def set_rows(self, rows):
+        super().set_rows(rows)
+        self.name = f"spacer-{self.columns[0]}-{self.rows[0]}"
+
     def create_template(self, parent):
         el = document.createElement("div")
         el.style.width = self.width
