@@ -67,8 +67,10 @@ class ApplicationState(OptionManager):
         packed = None
         __pragma__('js', '{}', '''
         try {
-            packed = new Uint8Array(Buffer.from(window.location.hash, "base64"));
-        } catch(error) {}
+            packed = new Uint8Array(Buffer.from(window.location.hash.slice(1), "base64"));
+        } catch(error) {
+            console.warn("Cannot decode hash", error);
+        }
         ''')
         if packed is not None:
             window.lbo.transmitter.decode(packed).then(set_state, set_error)
@@ -77,7 +79,15 @@ class ApplicationState(OptionManager):
 
         __pragma__("else")
 
-        json = atob(window.location.hash)
+        json = {}  # __:jsiter
+        __pragma__('js', '{}', '''
+        try {
+            json = JSON.parse(atob(window.location.hash.slice(1)));
+        } catch(error) {
+            console.warn("Cannot decode hash", error, window.location.hash.slice(1));
+        }
+        ''')
+
         self._tree_to_options(json)
         promise.resolve()
 
@@ -150,10 +160,13 @@ class ApplicationState(OptionManager):
 __pragma__("ifdef", "socket")
 """?
 from .server import transmitter
+?"""
+__pragma__("endif")
+
+"""?
 window.lbo.state = ApplicationState()
 loading_modules.push(window.lbo.state.synch_from_hash().promise)
 ?"""
-__pragma__("endif")
 
 
 class Session:
@@ -202,7 +215,6 @@ class Session:
             executer.add(self._build_tabindex)
 
     def _build_tabindex(self, root=None):
-        console.log("***build tabindex")
         root = root if root is not None else self.root
         tindex = 1000
         for c in root.get_tab_elements():
