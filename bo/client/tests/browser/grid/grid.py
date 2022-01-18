@@ -14,7 +14,7 @@ logger = getLogger("main")
 
 if __name__ == "__main__":
     config_logging(os.environ.get("LARCH_BO_QT_FRONTEND_STARTED", "qt")+"-grid.log", __file__)
-    config = {"debug": True, "noanimation": False, "transmitter": "socket"}
+    config = {"debug": True, "noanimation": False}
     sys.exit(run(__file__, config=config))
 # ---------------------------------------------------
 # __pragma__ ("noskip")

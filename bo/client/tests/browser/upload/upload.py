@@ -1,12 +1,12 @@
 from time import time
-from larch.reactive import Reactive, rule, Cell, Pointer
+from larch.reactive import Reactive, rule, Cell
 from larch.bo.client.wc.vaadin import vbutton, vdialog, vprogress, styles
 from larch.bo.client.grid import Grid
 from larch.bo.client.table import Table
 from larch.bo.client.table.listdata import ListDataProvider
 from larch.bo.client.i18n import gettext as _
 from larch.bo.client.command import label
-from larch.bo.client.control import ControlContext, register
+from larch.bo.client.control import register
 from larch.bo.client.session import Session
 from larch.bo.client.browser import start_main
 from larch.bo.client.file import FileUploader, gui, FileItem

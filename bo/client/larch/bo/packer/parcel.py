@@ -145,6 +145,7 @@ def watch(linker):
         signal.raise_signal(signal.SIGINT)
     finally:
         process.stdin.close()
+        process.wait(1)
         process.kill()
 
 

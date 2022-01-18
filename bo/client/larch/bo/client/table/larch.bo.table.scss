@@ -24,8 +24,12 @@
     border-bottom: 1px solid var(--lbo-contrast-20pct);
   }
 
-  div.back {
+  section {
     border-bottom: 1px solid var(--lbo-contrast-20pct);
+  }
+
+  section:last-of-type {
+    border-bottom: none;
   }
 
   footer.back {

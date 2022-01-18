@@ -5,11 +5,12 @@ import logging
 import mimetypes
 import socket
 from time import time
+from datetime import datetime, date, time as dtime
 from gevent import Timeout, GreenletExit
 from werkzeug.wrappers import Request, Response
 from werkzeug.routing import Map, Rule
 from werkzeug.exceptions import HTTPException, BadRequest
-from msgpack import packb, Unpacker
+from msgpack import packb, ExtType, Unpacker
 from larch.lib.aspect import pointcut
 from larch.lib.gevent import Queue
 from .resource import ResourceManager
@@ -44,6 +45,18 @@ class MsgDecoder:
 
     def _ext_hook(self, code, data):
         return self.EXT_TYPES.get(code, lambda d: d)(data)
+
+
+def convert_to_msgpack(obj):
+    """some standard conversions"""
+
+    if isinstance(obj, datetime):
+        return ExtType(0x0D, packb(int(obj.timestamp()*1000)))
+
+    if isinstance(obj, date):
+        return ExtType(0x0D, packb(int(datetime.combine(obj, dtime()).timestamp()*1000)))
+
+    raise TypeError("cannot convert type to msgpck", type(obj), obj)
 
 
 class Application:
@@ -191,9 +204,12 @@ class Application:
     def handle_socket_request(self, sock, obj, active_requests):
         compress = self.config.get("wscompress", 8192)
         try:
+            if obj["method"].startswith("_"):
+                raise RuntimeError("not allowed", obj["method"])
+
             result = getattr(self.api, obj["method"])(*obj["args"], **obj["kwargs"])
             for o in iter_result(result, obj)[1]:
-                p = packb(o)
+                p = packb(o, default=convert_to_msgpack)
                 logger.debug("send response %r\n%r", len(p), o)
                 sock.send(p, True, len(p) >= compress)
         except Exception as e:
