@@ -15,6 +15,7 @@
   > div {
     padding: var(--lbo-space-xs);
     overflow: hidden;
+    justify-self: stretch;
     &.scrollable {
       overflow: auto;
     }
@@ -64,13 +65,51 @@ html, body {
 }
 
 html {
-  font-size: var(--lumo-font-size-m);
-  font-family: var(--lumo-font-family);
-  color: var(--lumo-body-text-color);
+  font-size: var(--lbo-font-size-m);
+  font-family: var(--lbo-font-family);
+  color: var(--lbo-body-text-color);
   background: var(--lbo-base-color);
 }
 
 h3 {
   font-size: var(--lbo-font-size-m);
   margin: 0;
+}
+
+
+.lbo-align-left {
+  justify-self: start;
+}
+
+.lbo-align-center {
+  justify-self: center;
+}
+
+.lbo-align-right {
+  justify-self: end;
+}
+
+.lbo-align-stretch {
+  justify-self: stretch;
+}
+
+.lbo-align-top {
+  align-self: start;
+}
+
+.lbo-align-middle {
+  align-self: center;
+}
+
+.lbo-align-bottom {
+  align-self: end;
+}
+
+.lbo-align-extend {
+  align-self: stretch;
+}
+
+.lbo-placeholder {
+  color: transparent;
+  background: var(--lbo-contrast-50pct);
 }

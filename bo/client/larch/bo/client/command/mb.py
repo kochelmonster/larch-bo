@@ -1,4 +1,4 @@
-from . import command, stop_event, CommandHandler
+from . import command, stop_event, MixinCommandHandler
 from ..i18n import pgettext
 # __pragma__("skip")
 window = document = console = setInterval = clearInterval = None
@@ -13,7 +13,7 @@ def common_prefix(s1, s2):
     return i + 1
 
 
-class MiniBuffer(CommandHandler):
+class MiniBuffer(MixinCommandHandler):
     """Enter commands from a minibuffer line like emacs"""
     TIMER_DELTA = 50
 
@@ -173,7 +173,7 @@ class MiniBuffer(CommandHandler):
         for element in document.querySelectorAll(".lbo-commands"):
             self.collect_commands_from_element(element, self.active_commands, 1)
 
-        for element in event.path:
+        for element in event.composedPath():
             self.collect_commands_from_element(element, self.active_commands, 0)
 
     def collect_commands_from_element(self, element, result, only_globals):

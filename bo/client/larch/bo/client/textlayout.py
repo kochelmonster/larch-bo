@@ -24,7 +24,7 @@ class Cell:
     """a compiled regular expression"""
 
     REGEXP = r"([^\d\W]\w*:)?"
-    """regulare expression for cell name"""
+    """regular expression for cell name"""
 
     name = ""
     """the unique name of the cell"""
@@ -68,11 +68,11 @@ class DOMCell(Cell):
     def __bool__(self):
         return True
 
-    def set_css_style(self, style):
-        style.gridColumnStart = str(self.columns[0]+1)
-        style.gridColumnEnd = str(self.columns[1]+2)
-        style.gridRowStart = str(self.rows[0]+1)
-        style.gridRowEnd = str(self.rows[1]+2)
+    def set_css_style(self, element):
+        element.style.gridColumnStart = str(self.columns[0]+1)
+        element.style.gridColumnEnd = str(self.columns[1]+2)
+        element.style.gridRowStart = str(self.rows[0]+1)
+        element.style.gridRowEnd = str(self.rows[1]+2)
 
 
 class Empty(Cell):
@@ -124,26 +124,26 @@ class AlignedCell(DOMCell):
         result = super().__repr__()
         return result[:-1] + "{" + self.alignment + "}>"  # __:opov
 
-    def set_css_style(self, style):
-        super().set_css_style(style)
-
+    def set_css_style(self, element):
+        super().set_css_style(element)
+        classlist = element.classList
         if "l" in self.alignment:
-            style.justifySelf = "start"
+            classlist.add("lbo-align-left")
         elif "c" in self.alignment:
-            style.justifySelf = "center"
+            classlist.add("lbo-align-center")
         elif "r" in self.alignment:
-            style.justifySelf = "end"
+            classlist.add("lbo-align-right")
         elif "j" in self.alignment:
-            style.justifySelf = "stretch"
+            classlist.add("lbo-align-stretch")
 
         if "t" in self.alignment:
-            style.alignSelf = "start"
+            classlist.add("lbo-align-top")
         elif "m" in self.alignment:
-            style.alignSelf = "center"
+            classlist.add("lbo-align-middle")
         elif "b" in self.alignment:
-            style.alignSelf = "end"
+            classlist.add("lbo-align-bottom")
         elif "e" in self.alignment:
-            style.alignSelf = "stretch"
+            classlist.add("lbo-align-extend")
 
 
 class Parser:

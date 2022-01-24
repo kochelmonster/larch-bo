@@ -68,7 +68,7 @@ def stop_event(event):
     event.preventDefault()
 
 
-class CommandHandler:
+class MixinCommandHandler:
     """Mixin for Control to handle commands and key strokes"""
 
     def collect_commands(self, element):
@@ -127,7 +127,7 @@ class CommandManager:
         "=": "+", ";": ": ", "'": "\"", ",": "<", ".": ">", "/": "?",
         "\\": "|"}
 
-    EVENTS = ["keydown", "click", "dblclick", "mousedown", "mouseup", "wheel"]
+    EVENTS = ["keydown", "click", "dblclick", "pointerdown", "pointerup", "wheel"]
     # __pragma__("nojsiter")
 
     KEY_ABORT = "ctrl+g"
@@ -159,7 +159,7 @@ class CommandManager:
         self.show_keys(key.split(" "))
 
     def show_keys(self, keys):
-        self.keystroke_div.innerHTML = ""
+        self.keystroke_div.replaceChildren()
         for k in keys:
             el = document.createElement("span")
             el.classList.add("lbo-keystroke")
@@ -172,7 +172,7 @@ class CommandManager:
         self.keystroke_div.classList.add("hidden")
 
     def match_command(self, event, detected_keys):
-        for element in event.path:
+        for element in event.composedPath():
             if element.lbo_commands:
                 if self.execute_command(element, event, detected_keys, 0):
                     return
@@ -252,7 +252,7 @@ class CommandManager:
             if etype == "contextmenu":
                 return {self.active_key_sequence+"contextmenu": True}  # __:jsiter
 
-            if etype == "mousedown":
+            if etype == "pointerdown":
                 self.click_start_time = window.performance.now()
 
             # mouse

@@ -1,5 +1,5 @@
 # import larch.lib.adapter as adapter
-from larch.bo.client.command import command, CommandHandler, mb
+from larch.bo.client.command import command, MixinCommandHandler, mb
 from larch.bo.client.browser import start_main
 # __pragma__("skip")
 # ---------------------------------------------------
@@ -37,7 +37,7 @@ HTML = """
 """
 
 
-class Input(CommandHandler):
+class Input(MixinCommandHandler):
     def __init__(self, test):
         self.test = test
 
@@ -64,7 +64,7 @@ class Input2(Input):
         self.test.output.innerText += "Input menu2 called\n"
 
 
-class CommandTest(CommandHandler):
+class CommandTest(MixinCommandHandler):
     def render(self, parent):
         el = document.createElement("div")
         el.innerHTML = HTML

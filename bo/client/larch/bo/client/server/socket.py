@@ -37,6 +37,7 @@ self.onmessage = function(e) {
          } catch (exc) {
             request.action = "error";
             request.error = exc.toString();
+            request["from"] = "decode"
          }
          delete request.data
          postMessage(request);
@@ -130,7 +131,7 @@ def wsreceive(event):
 
 def wserror(event):
     global active_socket
-    # console.warn("got websocket error", event, active_socket)
+    console.warn("got websocket error", event, active_socket)
     # __pragma__("jsiter")
     postMessage({
         "action": "error",

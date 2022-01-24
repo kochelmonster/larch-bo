@@ -12,6 +12,8 @@ html {
   --lbo-primary-text-color: var(--lumo-primary-text-color);
   --lbo-secondary-text-color: var(--lumo-secondary-text-color);
 
+  --lbo-primary-color-10pct: var(--lumo-primary-color-10pct);  // table cursor background
+  --lbo-primary-color-50pct: var(--lumo-primary-color-50pct);  // table cursor outline
 
   --lbo-border-radius-l: var(--lumo-border-radius-l);
   --lbo-border-radius-m: var(--lumo-border-radius-m);
@@ -23,6 +25,7 @@ html {
   --lbo-contrast-10pct: var(--lumo-contrast-10pct);  // input background
   --lbo-contrast-20pct: var(--lumo-contrast-20pct);  // border color
   --lbo-contrast-40pct: var(--lumo-contrast-40pct);
+  --lbo-contrast-50pct: var(--lumo-contrast-50pct);  // placeholders
 
   // switch styling
   --on-color: var(--lumo-primary-text-color);

@@ -6,6 +6,7 @@ import mimetypes
 import socket
 from time import time
 from datetime import datetime, date, time as dtime
+from decimal import Decimal
 from gevent import Timeout, GreenletExit
 from werkzeug.wrappers import Request, Response
 from werkzeug.routing import Map, Rule
@@ -55,6 +56,9 @@ def convert_to_msgpack(obj):
 
     if isinstance(obj, date):
         return ExtType(0x0D, packb(int(datetime.combine(obj, dtime()).timestamp()*1000)))
+
+    if isinstance(obj, Decimal):
+        return float(obj)
 
     raise TypeError("cannot convert type to msgpck", type(obj), obj)
 
@@ -210,7 +214,7 @@ class Application:
             result = getattr(self.api, obj["method"])(*obj["args"], **obj["kwargs"])
             for o in iter_result(result, obj)[1]:
                 p = packb(o, default=convert_to_msgpack)
-                logger.debug("send response %r\n%r", len(p), o)
+                logger.debug("send response %r %r\n%r", len(p), len(p) >= compress, o)
                 sock.send(p, True, len(p) >= compress)
         except Exception as e:
             logger.exception("exception executing %r\n%r", e, obj)

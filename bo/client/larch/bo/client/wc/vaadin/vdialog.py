@@ -72,7 +72,7 @@ class Dialog:
                 self.last_active = None
 
     def _render_into_dialog(self, root, dialog):
-        root.innerHTML = ""
+        root.replaceChildren()
         if self.context.control:
             self.context.control.render(root)
 

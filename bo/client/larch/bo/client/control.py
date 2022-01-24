@@ -238,7 +238,7 @@ class RenderingContext(ControlContext):
         return f"{t.__name__}:{t.__module__}-{style}" if t else None
 
     def render_to_container(self):
-        self.container.innerHTML = ""
+        self.container.replaceChildren()
         self.control.render(self.container)
 
     @rule(-1)

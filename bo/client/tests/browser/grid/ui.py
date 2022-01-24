@@ -5,7 +5,7 @@ from larch.bo.client.grid import Grid, splitter
 from larch.bo.client.browser import start_main
 from larch.bo.client.session import Session
 from larch.bo.client.control import register
-from larch.bo.client.command import label, icon, command, CommandHandler
+from larch.bo.client.command import label, icon, command, MixinCommandHandler
 from larch.bo.client.animate import animator
 
 # __pragma__("skip")
@@ -41,7 +41,7 @@ class AllLive:
 
 
 @register(Model)
-class CheckForm(CommandHandler, AllLive, Grid):
+class CheckForm(MixinCommandHandler, AllLive, Grid):
     layout = """
 First Name|[first]
 Last Name |[last]

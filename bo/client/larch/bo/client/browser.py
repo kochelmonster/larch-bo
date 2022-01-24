@@ -58,7 +58,7 @@ def as_array(pyobj):
 
 
 class Executer:
-    MAX_EXECUTON_TIME = 5   # in ms
+    MAX_EXECUTON_TIME = 10   # in ms
 
     def __init__(self):
         self.tasks = deque()
@@ -76,11 +76,11 @@ class Executer:
             task(*args)
         return self
 
-    def _step(self, call_time):
+    def _step(self):
+        call_time = window.performance.now()
         while len(self.tasks):
             task, args = self.tasks.popleft()
             task(*args)
-
             if window.performance.now() - call_time > self.MAX_EXECUTION_TIME:
                 self.active_id = window.requestAnimationFrame(self._step)
                 return
@@ -156,14 +156,14 @@ def get_metrics():
         metrics = {}  # __:jsiter
         tmp = document.createElement("div")
         tmp.style.display = "inline-block"
-        tmp.position = "absolute"
-        tmp.visibility = "hidden"
+        tmp.style.position = "absolute"
+        tmp.style.visibility = "hidden"
         tmp["font-family"] = "Courier New"
+        tmp.innerHTML = "&mdash;"
         document.body.appendChild(tmp)
         rect = tmp.getBoundingClientRect()
         metrics.line_height = rect.height
         metrics.ex_width = rect.width
-        tmp.innerHTML = "&mdash;"
         metrics.em_width = tmp.getBoundingClientRect().width
         tmp.style.height = "1pt"
         metrics.pt_height = tmp.getBoundingClientRect().height
@@ -185,14 +185,21 @@ class PyPromise:
         return self
 
 
-js_date = None
+js_dom = js_date = None
 
 __pragma__('js', '{}', '''
 js_date = function js_date(val) {
     return new Date(val);
 }
-
 Date.prototype.__class__ = js_date;
 js_date.__name__ = "js_date";
 js_date.__bases__ = [object];
+
+
+js_dom = function js_dom(tag) {
+    return document.createElement(tag);
+}
+HTMLElement.prototype.__class__ = js_dom;
+js_dom.__name__ = "js_dom";
+js_dom.__bases__ = [object];
 ''')

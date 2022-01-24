@@ -1,5 +1,6 @@
 import larch.lib.adapter as adapter
-from .browser import get_bubble_attribute, js_date
+from .browser import get_bubble_attribute, js_date, js_dom
+# __pragma__("ecom")
 
 
 # __pragma__("skip")
@@ -7,6 +8,7 @@ class Mock:
     pass
 
 
+adapter, js_date, js_dom
 document = console = Intl = window = navigator = Date = Mock()
 window.lbo = Mock()
 def require(n): pass
@@ -105,17 +107,30 @@ ngettext = Plural
 npgettext = ContextPlural
 
 
+# __pragma__("jsiter")
+DEFAULT_NUMBER_STYLE = {
+    "notation": "standard",
+    "maximumFractionDigits": 2,
+    "minimumFractionDigits": 2}
+
+DEFAULT_DATE_STYLE = {
+    "month": "2-digit",
+    "day": "2-digit",
+    "year": "numeric"}
+# __pragma__("nojsiter")
+
+
 def create_number_formatter(style=None, element=None):
     lang = get_lang(element)
     if style is None:
-        style = {"notation": "standard", "maximumFractionDigits": 2}  # __:jsiter
+        style = DEFAULT_NUMBER_STYLE
     return __new__(Intl.NumberFormat(lang, style)).format
 
 
 def create_date_formatter(style=None, element=None):
     lang = get_lang(element)
     if style is None:
-        style = {"month": "2-digit", "day": "2-digit", "year": "numeric"}  # __:jsiter
+        style = DEFAULT_DATE_STYLE
     return __new__(Intl.DateTimeFormat(lang, style)).format
 
 
@@ -165,5 +180,39 @@ def get_first_day_of_week(locale):
     return 0
 
 
-adapter.register(float, HTML, "", create_number_formatter)
-adapter.register(js_date, HTML, "", create_date_formatter)
+def create_number_painter(style=None, element=None):
+    format_ = create_number_formatter(style, element)
+
+    def number_painter(dest, value):
+        dest.innerText = format_(value)
+    return number_painter
+
+
+def create_date_painter(style=None, element=None):
+    format_ = create_date_formatter(style, element)
+
+    def date_painter(dest, value):
+        dest.innerText = format_(value)
+    return date_painter
+
+
+def create_str_painter(style=None, element=None):
+    def str_painter(dest, value):
+        dest.innerText = str(value)
+    return str_painter
+
+
+def create_dom_painter(style=None, element=None):
+    def dom_painter(dest, value):
+        dest.replaceChildren(value.cloneNode(True))
+    return dom_painter
+
+
+"""?
+adapter.register(float, HTML, "", create_number_painter)
+adapter.register(js_date, HTML, "", create_date_painter)
+adapter.register(str, HTML, "", create_str_painter)
+adapter.register(int, HTML, "", create_str_painter)
+adapter.register(Translation, HTML, "", create_str_painter)
+adapter.register(js_dom, HTML, "", create_dom_painter)
+?"""

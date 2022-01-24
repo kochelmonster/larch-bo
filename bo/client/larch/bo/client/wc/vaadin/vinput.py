@@ -41,20 +41,26 @@ class TextControl(MixinLiveTracker, MixinVaadin, MixinStyleObserver, Control):
         element.addEventListener("change", self.on_change)
 
     def on_change(self, event):
-        self.context.value = self.element.value
+        self.context.value = self.html_to_python(self.element.value)
 
     def get_poll_value(self):
-        return self.element.value
+        return self.html_to_python(self.element.value)
 
     def update_styles(self):
         super().update_styles()
         for value in self.context.loop("autocomplete"):
             self.element.autocomplete = value
 
+    def html_to_python(self, value):
+        return value
+
+    def python_to_html(self, value):
+        return value
+
     @rule
     def _rule_value_changed(self):
         if self.element:
-            self.element.setAttribute("value", self.context.value)
+            self.element.setAttribute("value", self.python_to_html(self.context.value))
 
 
 class EmailControl(TextControl):
@@ -68,9 +74,21 @@ class PasswordControl(TextControl):
 class IntControl(TextControl):
     TAG = "vaadin-number-field"
 
+    def html_to_python(self, value):
+        return int(value)
+
+    def python_to_html(self, value):
+        return str(value)
+
 
 class FloatControl(TextControl):
     TAG = "vaadin-number-field"
+
+    def html_to_python(self, value):
+        return float(value)
+
+    def python_to_html(self, value):
+        return str(value)
 
 
 class TextAreaControl(TextControl):

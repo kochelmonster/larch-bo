@@ -57,7 +57,7 @@ class Label(AlignedCell):
 
     def create_template(self, parent):
         el = document.createElement("label")
-        self.set_css_style(el.style)
+        self.set_css_style(el)
         parent.appendChild(el)
 
     def create_context(self):
@@ -106,7 +106,7 @@ class Field(AlignedCell):
 
     def create_template(self, parent):
         el = document.createElement("div")
-        self.set_css_style(el.style)
+        self.set_css_style(el)
         parent.appendChild(el)
 
     def create_context(self, grid):
@@ -142,7 +142,7 @@ class Spacer(DOMCell):
         el = document.createElement("div")
         el.style.width = self.width
         el.style.height = self.height
-        self.set_css_style(el.style)
+        self.set_css_style(el)
         parent.appendChild(el)
 
     def create_context(self):
