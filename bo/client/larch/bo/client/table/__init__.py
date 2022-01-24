@@ -255,7 +255,6 @@ class Table(Control):
                 for size, c in zip(columns, self.stretchers):
                     tmp.append(f"{c.stretch}fr" if c.stretch else f"minmax({size}, auto)")
                 self.viewport.style["grid-template-columns"] = " ".join(tmp)
-                console.log("***change columns", columns)
 
             self.update_scrollbar()
 
@@ -271,11 +270,11 @@ class Table(Control):
         anchor = self.rows[self.anchor.row - self.row_start]
 
         # inside the display block
-        scroll_pos = max(
-            anchor.getBoundingClientRect().top
-            - top_section.getBoundingClientRect().top
-            - self.anchor.offset, 0)
-        relation = scroll_pos / real_height
+        scroll_pos = (anchor.getBoundingClientRect().top
+                      - top_section.getBoundingClientRect().top
+                      - self.anchor.offset)
+        relation = scroll_pos / (real_height-self.element.getBoundingClientRect().height)
+        relation = max(0, min(1, relation))
 
         upper_space = self.row_start * self.row_height + delta * relation
         lower_space = (self.row_count - self.row_end) * self.row_height + delta * (1-relation)

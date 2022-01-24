@@ -63,7 +63,7 @@ class MixinCursor:
         event = window.lbo.command_context.event
         if event and event.target:
             row = event.target.lbo_row
-            if row or row == 0:
+            if row and row > 0 or row == 0:
                 self.cursor = event.target.lbo_row
                 self.scroll_to_cursor()
 
