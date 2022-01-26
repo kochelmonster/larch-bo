@@ -1,4 +1,4 @@
-from larch.reactive import Cell, rule
+from larch.reactive import Cell, rule, Reactive
 from larch.bo.client.wc.vaadin import vbutton, vinput, vcheckbox, vswitch, vdate, styles
 from larch.bo.client.grid import Grid
 from larch.bo.client.i18n import create_number_painter
@@ -25,24 +25,33 @@ vswitch.register()
 
 class Controller(Grid):
     layout = """
-Disable |[.disabled]@switch
-Readonly|[.readonly]@switch
-Count   |[.count]
+Disable      |[.disabled]@switch
+Readonly     |[.readonly]@switch
+Count        |[.count]
+Toggle Loader|[.chunked]@switch
 """
 
     disabled = Cell(False)
     readonly = Cell(False)
     count = Cell(500)
+    chunked = Cell(False)
+
+    @rule
+    def _rule_change_count(self):
+        if self.element:
+            console.log("change chunked", self.chunked)
+            self.contexts["count"].set("disabled", self.chunked)
 
 
-class EmployeeLoader(provider.DelayedDataProvider):
+class EmployeeLoader(provider.DelayedDataProvider, Reactive):
     """?
     # __pragma__("jsiter")
-    placeholder = {
+    PLACEHOLDER = {
+        '__placeholder__': True,
         'id_': 10000,
         'name': 'Jennifer Davis',
         'office': 'Chaneystad',
-        'age': 62, 'salary': 7295.72,
+        'age': 162, 'salary': 7295.72,
         'start': __new__(Date(2020, 3, 20)),
         'address': '45243 Cassandra Passage Suite 025\nSouth Allisonberg, RI 03664'
     }
@@ -51,14 +60,16 @@ class EmployeeLoader(provider.DelayedDataProvider):
 
     count = 1000
     table = None
+    avg_age = Cell(0)
+    avg_salary = Cell(0)
 
     def __repr__(self):
         return "<EmployeeLoader>"
 
     def set_table(self, table):
         self.table = table
+        self.table.provider = self
         self.resolve_data()
-        return self
 
     def load_data(self):
         return window.lbo.server.load_data(0, self.count)
@@ -68,15 +79,25 @@ class EmployeeLoader(provider.DelayedDataProvider):
         self.count = count
         if self.table:
             self.set_data(None)
+            self.table.clear()
             self.resolve_data()
 
-    def avg_age(self):
-        data = self.get_data()
-        return sum([data[i].age for i in range(len(data))]) / len(data) if data else 0
+    def set_data(self, data):
+        super().set_data(data)
+        if data:
+            self.avg_age = sum([data[i].age for i in range(len(data))]) / len(data)
+            self.avg_salary = sum([data[i].salary for i in range(len(data))]) / len(data)
+        else:
+            self.avg_age = self.avg_salary = 0
 
-    def avg_salary(self):
-        data = self.get_data()
-        return sum([data[i].salary for i in range(len(data))]) / len(data) if data else 0
+
+class ChunkedEmployeeLoader(provider.DelayedChunkProvider):
+    """?
+    PLACEHOLDER = EmployeeLoader.PLACEHOLDER
+    ?"""
+
+    def load_chunk(self, row):
+        return window.lbo.server.load_chunk(row)
 
 
 @register(EmployeeLoader)
@@ -119,11 +140,11 @@ Id       |Name      | Office     |Age          |Start      |Salary           |Ad
 
     @property
     def avg_age(self):
-        return self.provider.avg_age()
+        return self.provider.avg_age
 
     @property
     def avg_salary(self):
-        return self.provider.avg_salary()
+        return self.provider.avg_salary
 
     @command(key="return,dblclick-0")
     def open(self):
@@ -131,16 +152,50 @@ Id       |Name      | Office     |Age          |Start      |Salary           |Ad
         console.log("***open", context)
 
 
+@register(ChunkedEmployeeLoader)
+class ChunkedEmployees(cursor.MixinCursor, MixinCommandHandler, Table):
+    layout = """
+    Emplyoees{c}
+Id       |Name      | Office     |Age          |Start      |Salary           |Address
+---
+[.js.id_]|[.js.name]|[.js.office]|[.js.age]{r} |[.js.start]|[.js.salary]{r}  |[.js.address]
+                                                                             |<1>
+"""
+
+    def __init__(self, cv=None):
+        super().__init__(cv)
+
+        # __pragma__("jsiter")
+        style = {
+            "currency": "EUR",
+            "currencyDisplay": "symbol",
+            "style": "currency"
+        }
+        # __pragma__("nojsiter")
+        self.value_painters["salary"] = create_number_painter(style)
+
+    @command(key="return,dblclick-0")
+    def open(self):
+        context = self.get_event_context()
+        console.log("***open", context)
+
+    def set_count(self, count):
+        pass
+
+
 class Frame(Grid):
+    employees = Cell()
+
     layout = """
       (0,4em)
-[.employees]{e}|[.controller]|<1>
+[.employees]{l}|[.controller]|<1>
       (0,4.1em)
+<1>            |
 """
 
     def __init__(self, cv):
         super().__init__(cv)
-        self.employees = window.emps = EmployeeLoader()
+        self.employees = EmployeeLoader()
         self.controller = Controller()
 
     @rule
@@ -148,6 +203,16 @@ class Frame(Grid):
         count = self.controller.count
         yield
         self.employees.set_count(count)
+
+    @rule
+    def _rule_toggle_employees(self):
+        chunked = self.controller.chunked
+        yield
+        if chunked:
+            self.employees = ChunkedEmployeeLoader()
+        else:
+            self.employees = EmployeeLoader()
+            self.employees.set_count(self.controller.count)
 
 
 def main():

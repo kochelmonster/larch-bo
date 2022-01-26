@@ -15,6 +15,17 @@
     outline-style: none;
   }
 
+  &.placeholder {
+    cursor: wait;
+  }
+
+  &.placeholder .b span {
+    color: transparent;
+    background: var(--lbo-contrast-40pct);
+    border-radius: 50px;
+    display: inline-block;
+  }
+
   > div {
     display: grid;
     justify-content: start;
@@ -22,6 +33,7 @@
     grid-auto-rows: auto;
     > div, header, footer {
       padding: var(--lbo-space-xs) var(--lbo-space-m);
+      box-sizing: border-box;
     }
     > .scroll-padding {
       padding: 0;

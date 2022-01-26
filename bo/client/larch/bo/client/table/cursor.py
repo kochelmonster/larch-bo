@@ -33,39 +33,43 @@ class MixinCursor:
 
     @command(key="pageup")
     def cursor_pageup(self):
-        row = self.rows[self.cursor-self.row_start]
+        start = self.rows[0].lbo_row
+        row = self.rows[self.cursor-start]
         if row:
             top = row.getBoundingClientRect().top
             height = self.element.clientHeight - self.header.height - self.footer.height
-            r = self.cursor - self.row_start
-            for r in range(self.cursor-1-self.row_start, -1, -1):
+            r = self.cursor - start
+            for r in range(self.cursor-1-start, -1, -1):
                 if top - self.rows[r].getBoundingClientRect().top >= height:
                     break
-            self.cursor = r + self.row_start
+            self.cursor = r + start
             self.scroll_to_cursor()
 
     @command(key="pagedown")
     def cursor_pagedown(self):
-        row = self.rows[self.cursor-self.row_start]
+        start = self.rows[0].lbo_row
+        row = self.rows[self.cursor-start]
         if row:
             top = row.getBoundingClientRect().top
             height = self.element.clientHeight - self.header.height - self.footer.height
-            r = self.cursor - self.row_start
-            for r in range(self.cursor+1-self.row_start, self.rows.length):
+            r = self.cursor - start
+            for r in range(self.cursor+1-start, self.rows.length):
                 if self.rows[r].getBoundingClientRect().top - top >= height:
                     break
-            self.cursor = r + self.row_start
+            self.cursor = r + start
             self.scroll_to_cursor()
 
     @command(key="pointerdown-0")
     def cursor_mouse(self):
         self.element.focus()
         event = window.lbo.command_context.event
-        if event and event.target:
-            row = event.target.lbo_row
-            if row and row > 0 or row == 0:
-                self.cursor = event.target.lbo_row
-                self.scroll_to_cursor()
+        if event:
+            for element in event.composedPath():
+                row = element.lbo_row
+                if row and row > 0 or row == 0:
+                    self.cursor = row
+                    self.scroll_to_cursor()
+                    return
 
     def get_event_context(self):
         row = name = None
@@ -95,7 +99,8 @@ class MixinCursor:
         return [self.element]
 
     def scroll_to_cursor(self):
-        row = self.rows[self.cursor-self.row_start]
+        start = self.rows[0].lbo_row
+        row = self.rows[self.cursor-start]
         if row:
             # scrollIntoView does not work with sticky headers/footers
             rect = self.element.getBoundingClientRect()
@@ -135,7 +140,8 @@ class MixinCursor:
                 return
 
             self.old_cursor = cursor
-            row = self.rows[cursor-self.row_start]
+            start = self.rows[0].lbo_row
+            row = self.rows[cursor-start]
             if row:
                 for c in self.body.contexts:
                     row.classList.add("cursor")

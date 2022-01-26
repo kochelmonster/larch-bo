@@ -75,6 +75,9 @@ class Content(AlignedCell):
     def create(self, grid, tag):
         el = document.createElement(tag)
         self.set_css_style(el)
+        span = document.createElement("span")
+        el.appendChild(span)
+
         name = self.name
 
         if self.path.startswith(".js."):
@@ -82,7 +85,7 @@ class Content(AlignedCell):
             attrib = self.path[4:]
 
             def renderer(element):
-                grid.render_value(element, name, grid.render_context.value[attrib])
+                grid.render_value(element.firstChild, name, grid.render_context.value[attrib])
 
         else:
             pointer = Pointer(grid)
@@ -91,7 +94,7 @@ class Content(AlignedCell):
             pointer = walk_pointer(pointer, self.path)
 
             def renderer(element):
-                grid.render_value(element, name, pointer.__call__())
+                grid.render_value(element.firstChild, name, pointer.__call__())
 
         context = {"renderer": renderer, "rows": self.rows, "name": self.name}
         return el, context
