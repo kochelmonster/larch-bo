@@ -146,7 +146,6 @@ class Animator:
         new_.style.opacity = "0"
         new_.classList.add("appearing")
         old_.classList.add("disappearing")
-        console.log("**replace")
 
         def after(finished):
             new_.style.opacity = ""
