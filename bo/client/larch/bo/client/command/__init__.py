@@ -1,3 +1,4 @@
+from inspect import getmro
 from .. import browser  # for window.lbo
 
 # __pragma__("skip")
@@ -76,16 +77,22 @@ class MixinCommandHandler:
         commands = {}  # __:jsiter
         functype = type(stop_event)
         is_global = False
-        for name in dir(self):
-            v = getattr(self, name)
-            if isinstance(v, functype):
+        for cls in getmro(self.__class__):
+            # __pragma__("jsiter")
+            for name in cls.__class_attribs__:
+                # __pragma__("nojsiter")
+                v = cls.__class_attribs__[name]
+                if not isinstance(v, functype):
+                    continue
+
                 command = v.__command__
                 if command:
                     if command is True:
                         command = name.replace("_", "-")
-                    commands[command] = v
-                if v.__command_is_global__:
-                    is_global = True
+                    if command not in commands:
+                        commands[command] = getattr(self, name)
+                        if v.__command_is_global__:
+                            is_global = True
 
         if len(commands):
             make_command_manager()
