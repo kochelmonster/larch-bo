@@ -11,28 +11,62 @@ class MixinCursor:
     cursor = Cell(0)
     old_cursor = 0
 
+    def render(self, parent):
+        super().render(parent)
+        self.set_css_selection_class()
+
+    def set_css_selection_class(self):
+        self.element.classList.add("single-selection")
+
     @command(key="up")
     def cursor_up(self):
-        self.cursor -= 1
-        self.scroll_to_cursor()
+        self.set_cursor(self.cursor-1)
 
     @command(key="down")
     def cursor_down(self):
-        self.cursor += 1
-        self.scroll_to_cursor()
+        self.set_cursor(self.cursor+1)
 
     @command(key="home")
     def cursor_home(self):
-        self.cursor = 0
-        self.scroll_to_cursor()
+        self.set_cursor(0)
 
     @command(key="end")
     def cursor_end(self):
-        self.cursor = self.row_count - 1
-        self.scroll_to_cursor()
+        self.set_cursor(self.row_count-1)
 
     @command(key="pageup")
     def cursor_pageup(self):
+        cursor = self.get_pageup_position()
+        if cursor is not None:
+            self.set_cursor(cursor)
+
+    @command(key="pagedown")
+    def cursor_pagedown(self):
+        cursor = self.get_pagedown_position()
+        if cursor is not None:
+            self.set_cursor(cursor)
+
+    @command(key="pointerdown-0")
+    def cursor_mouse(self):
+        event = window.lbo.command_context.event
+        for p in event.composedPath():
+            if p.classList and p.classList.contains("selector"):
+                return
+
+        row = self.row_from_event(event)
+        if row >= 0:
+            self.set_cursor(row)
+        self.element.focus()
+        return False
+
+    def row_from_event(self, event):
+        for element in event.composedPath():
+            row = element.lbo_row
+            if row or row == 0:
+                return row
+        return -4
+
+    def get_pageup_position(self):
         start = self.rows[0].lbo_row
         row = self.rows[self.cursor-start]
         if row:
@@ -42,11 +76,10 @@ class MixinCursor:
             for r in range(self.cursor-1-start, -1, -1):
                 if top - self.rows[r].getBoundingClientRect().top >= height:
                     break
-            self.cursor = r + start
-            self.scroll_to_cursor()
+            return r + start
+        return None
 
-    @command(key="pagedown")
-    def cursor_pagedown(self):
+    def get_pagedown_position(self):
         start = self.rows[0].lbo_row
         row = self.rows[self.cursor-start]
         if row:
@@ -56,20 +89,14 @@ class MixinCursor:
             for r in range(self.cursor+1-start, self.rows.length):
                 if self.rows[r].getBoundingClientRect().top - top >= height:
                     break
-            self.cursor = r + start
-            self.scroll_to_cursor()
+            return r + start
+        return None
 
-    @command(key="pointerdown-0")
-    def cursor_mouse(self):
-        self.element.focus()
-        event = window.lbo.command_context.event
-        if event:
-            for element in event.composedPath():
-                row = element.lbo_row
-                if row and row > 0 or row == 0:
-                    self.cursor = row
-                    self.scroll_to_cursor()
-                    return
+    def set_cursor(self, cursor):
+        cursor = min(max(cursor, 0), self.row_count-1)
+        self.cursor = cursor
+        self.scroll_to_cursor()
+        return cursor
 
     def get_event_context(self):
         row = name = None
@@ -129,14 +156,6 @@ class MixinCursor:
                 el.classList.remove("cursor")
 
             if not self.rows.length:
-                return
-
-            if cursor < 0:
-                self.cursor = 0
-                return
-
-            if cursor >= self.row_count:
-                self.cursor = self.row_count - 1
                 return
 
             self.old_cursor = cursor

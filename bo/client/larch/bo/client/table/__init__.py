@@ -42,8 +42,10 @@ require("./larch.bo.table.scss")
 class Table(Control):
     STATIC_LIMIT = 200   # below this row_count no virtual list
     TOLERANCE = 7        # for better berformance
+    row_count = 0
     element = None
     updated = Cell(0)
+    control_handlers = {}
 
     def __init__(self, cv):
         super().__init__(cv)
@@ -168,13 +170,13 @@ class Table(Control):
         self.anchor.offset = 0
 
     def set_row_count(self, count):
+        self.element.removeEventListener("scroll", self.on_scroll)
         if count < self.STATIC_LIMIT:
             self.row_count = count
             self.block_size = count  # still performant
             self.update_row_templates()
             self.virtual_mode = False
             self.update_display()
-            self.element.removeEventListener("scroll", self.on_scroll)
             return
 
         update_block_size = False
@@ -184,6 +186,7 @@ class Table(Control):
             # enough to cover the screen
             update_block_size = True
             self.virtual_mode = False
+            self.row_count = count
             self.update_row_templates()
             self.update_display()
             self.element.addEventListener("scroll", self.on_scroll)
@@ -192,11 +195,12 @@ class Table(Control):
         elif self.row_end > count - 1:
             # shorten the display
             self.set_virtual_scroll_space(count)
+            self.row_count = count
             self.update_display()
         else:
             self.set_virtual_scroll_space(count)
+            self.row_count = count
 
-        self.row_count = count
         self.virtual_mode = True
 
         if update_block_size:
@@ -469,11 +473,11 @@ class RowTemplate(TemplateBase):
         i = 0
         for el in clone.children:
             context = self.contexts[i]
-            context.renderer(el)
             el.lbo_row = row
             el.lbo_col = i - 1
             el.style.gridRowStart = str(context.rows[0]+row+css_offset)
             el.style.gridRowEnd = str(context.rows[1]+row+css_offset+1)
+            context.renderer(el)
             i += 1
         return clone
 

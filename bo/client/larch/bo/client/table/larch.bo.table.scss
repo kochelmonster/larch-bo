@@ -11,19 +11,19 @@
   overflow-x: hidden;
   position: relative;
 
-  &:focus {
+  &:focus-within {
     outline-style: none;
   }
 
   &.placeholder {
     cursor: wait;
-  }
 
-  &.placeholder .b span {
-    color: transparent;
-    background: var(--lbo-contrast-40pct);
-    border-radius: 50px;
-    display: inline-block;
+    .b span {
+      color: transparent;
+      background: var(--lbo-contrast-40pct);
+      border-radius: 50px;
+      display: inline-block;
+    }
   }
 
   > div {
@@ -56,21 +56,29 @@
     }
   }
 
-  section {
-    border-top: 1px solid var(--lbo-contrast-20pct);
-    &.cursor {
+  &.multi-selection {
+    section.selection {
       background: var(--lbo-primary-color-10pct);
     }
+  }
+
+  &.single-selection {
+    section.cursor {
+      background: var(--lbo-primary-color-10pct);
+    }
+  }
+
+  section {
+    border-top: 1px solid var(--lbo-contrast-20pct);
   }
 
   section:first-of-type {
     border-top: none;
   }
 
-  &:focus .back.cursor {
+  &:focus-within .back.cursor {
     outline: 2px solid var(--lbo-primary-color-50pct);
     outline-offset: -2px;
-    z-index: 1;
   }
 
   header.back {

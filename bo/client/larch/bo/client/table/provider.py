@@ -100,13 +100,18 @@ class DelayedChunkProvider(TableDataProvider):
     @classmethod
     def set_table(cls, table):
         table.provider = cls(table)
-        table.set_row_count(table.provider.PLACEHOLDER_COUNT)  # the place holder
+        container = table.provider.make_chunk_container()
+        if container.count is None:
+            table.set_row_count(table.provider.PLACEHOLDER_COUNT)  # the place holder
+        else:
+            table.set_row_count(container.count)
 
     def make_chunk_container(self):
         container = self.__class__.data_chunks
         if not container:
             # __pragma__("jsiter")
             container = self.__class__.data_chunks = {
+                "count": None,
                 "chunk_size": 1,
                 "promises": {}
             }
@@ -126,6 +131,7 @@ class DelayedChunkProvider(TableDataProvider):
         del container.promises[chunk.start]
         container[chunk.start] = chunk.data
         container.chunk_size = chunk.chunk_size
+        container.count = chunk.count
         if chunk.count != self.table.row_count:
             self.table.set_row_count(chunk.count)
         if (self.table.row_start < chunk.start + chunk.chunk_size

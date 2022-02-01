@@ -1,8 +1,8 @@
 from larch.reactive import Cell, rule, Reactive
-from larch.bo.client.wc.vaadin import vbutton, vinput, vcheckbox, vswitch, vdate, styles
+from larch.bo.client.wc.vaadin import vbutton, vinput, vcheckbox, vswitch, vdate, styles, table
 from larch.bo.client.grid import Grid
 from larch.bo.client.i18n import create_number_painter
-from larch.bo.client.table import Table, provider, cursor
+from larch.bo.client.table import Table, provider, cursor, selection
 from larch.bo.client.command import MixinCommandHandler, command
 from larch.bo.client.browser import start_main
 from larch.bo.client.session import Session
@@ -21,6 +21,7 @@ vbutton.register()
 vinput.register()
 vcheckbox.register()
 vswitch.register()
+table.register()
 
 
 class Controller(Grid):
@@ -39,7 +40,6 @@ Toggle Loader|[.chunked]@switch
     @rule
     def _rule_change_count(self):
         if self.element:
-            console.log("change chunked", self.chunked)
             self.contexts["count"].set("disabled", self.chunked)
 
 
@@ -153,13 +153,13 @@ Id       |Name      | Office     |Age          |Start      |Salary           |Ad
 
 
 @register(ChunkedEmployeeLoader)
-class ChunkedEmployees(cursor.MixinCursor, MixinCommandHandler, Table):
+class ChunkedEmployees(selection.MixinSelection, MixinCommandHandler, Table):
     layout = """
     Emplyoees{c}
-Id       |Name      | Office     |Age          |Start      |Salary           |Address
+*    |Id       |Name      | Office     |Age         |Start      |Salary         |Address
 ---
-[.js.id_]|[.js.name]|[.js.office]|[.js.age]{r} |[.js.start]|[.js.salary]{r}  |[.js.address]
-                                                                             |<1>
+*{rt}|[.js.id_]|[.js.name]|[.js.office]|[.js.age]{r}|[.js.start]|[.js.salary]{r}|[.js.address]
+                                                                                |<1>
 """
 
     def __init__(self, cv=None):
@@ -217,6 +217,7 @@ class Frame(Grid):
 
 def main():
     print("start main")
+    document.body.style.userSelect = "none"
     Session(Frame()).boot()
 
 

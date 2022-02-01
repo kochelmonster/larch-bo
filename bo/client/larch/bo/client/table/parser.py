@@ -96,25 +96,28 @@ class Content(AlignedCell):
             def renderer(element):
                 grid.render_value(element.firstChild, name, pointer.__call__())
 
-        context = {"renderer": renderer, "rows": self.rows, "name": self.name}
+        context = {"renderer": renderer, "rows": self.rows, "name": self.name}  # __:jsiter
         return el, context
 
 
-class Selector(Cell):
-    @classmethod
-    def create_parsed(cls, cell_string, columns):
-        if cell_string.strip() == "*":
-            r = cls()
-            r.columns = columns
-            return r
-        return None
+class Selector(AlignedCell):
+    EXPRESSION = re.compile(r"[*]" + AlignedCell.REGEXP)
 
     def __bool__(self):
         return True
 
+    @classmethod
+    def create_cell(cls, mo):
+        tmp = cls()
+        tmp.alignment = mo.group(2) or ""
+        return tmp
+
     def create(self, grid, tag):
         el = document.createElement(tag)
-        return el, {"renderer": lambda element: None, "rows": self.rows, "name": "*"}
+        self.set_css_style(el)
+        handler = grid.control_handlers.checkbox(grid)
+        handler.create_template(el)
+        return el, {"renderer": handler.render, "rows": self.rows, "name": "*"}  # __:jsiter
 
 
 class HorzSeparator(Cell):
