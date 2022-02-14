@@ -28,6 +28,7 @@ class SwitchControl(MixinVaadin, MixinStyleObserver, Control):
         self.element.checked = self.context.value
         parent.appendChild(self.element)
         self.element.addEventListener("toggle", self.on_change)
+        self.update_styles()
 
     def on_change(self, event):
         self.context.value = self.element.checked

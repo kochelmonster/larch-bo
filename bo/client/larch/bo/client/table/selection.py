@@ -177,3 +177,30 @@ class MixinSelection(MixinCursor):
 
         for el in self.viewport.querySelectorAll(".selector"):
             el.update_selector(el)
+
+        self.updated += 1
+
+    def get_state(self):
+        state = super().get_state()
+        state["selection"] = self.selection
+        return state
+
+    def set_state(self, state):
+        super().set_state(state)
+        self.selection = state.selection or self.selection
+
+
+class MixinToggleSelector:
+    """A mixin that toggles selector visibility with long clicks"""
+
+    def render_frame(self):
+        self.element.classList.add("hide-selector")
+        super().render_frame()
+
+    @command(key="longclick-0")
+    def toggle_selector(self):
+        if self.element.classList.contains("hide-selector"):
+            self.element.classList.remove("hide-selector")
+        else:
+            self.element.classList.add("hide-selector")
+        self.reset_widths()

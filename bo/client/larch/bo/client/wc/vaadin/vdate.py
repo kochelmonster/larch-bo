@@ -76,6 +76,7 @@ class DatePickerControl(MixinVaadin, MixinStyleObserver, Control):
         label = self.context.get("label-element")
         if label:
             label.setAttribute("for", el.inputElement.id)
+        self.update_styles()
 
     def on_change(self, event):
         year, month, day = self.element.value.split("-")

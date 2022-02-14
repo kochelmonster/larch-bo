@@ -3,46 +3,17 @@ __import__('pkg_resources').declare_namespace(__name__)
 """
 todos:
 
-- qt:
-   - basis des testens (damit kann man auch (input wie file upload testen))
-   - file upload test
-
-grid:
-  - splitter
-    touchevents
-
-
-- gettext/i18n
-- Tab-ensure (stellt sicher dass der focus immer auf einen tab ist)
 
 - CommandHandler
- - minibuffer
- - key sequences
  - @i18n.label, @i18n.icon, @i18n.tooltip
- - @command(alias?)
  - @key_sequence(string or {platform: "string"})
 
 
-
-Table:
-   - fixed columns
-   - state save
-   - table handler
-   - tree handler
-   - multi selection
-
-
 Heute
-    - splitter
-    - state save (msgpack/json)
-    - to_object in transmitter
+   - heidi fehler
+   - update vica server
+   - vica-keys auf usb stick und regine geben
 
-    - DB LayoutCache in db implementieren und testen
-    - distracted-davince uptime überprüfen
-    - Fuse mit ebdav in sourcen schauen
-    - commands
-    - animation mit config["debug"] ausschaltbar machen
-
-
-
+   - Fuse mit ebdav in sourcen schauen
+   - commands
 """

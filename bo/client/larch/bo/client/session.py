@@ -39,10 +39,13 @@ class ApplicationState(OptionManager):
         self._hash_dirty += 1
         return self
 
-    def loop(self, control_id, item_id, value):
+    def get(self, control_id, item_id):
+        return OptionManager.get.call(self, f"{control_id}.{item_id}")
+
+    def loop(self, control_id, item_id):
         yield from OptionManager.loop.call(self, f"{control_id}.{item_id}")
 
-    def observe(self, control_id, item_id, value):
+    def observe(self, control_id, item_id):
         return OptionManager.observe.call(self, f"{control_id}.{item_id}")
 
     def synch_to_hash(self):
@@ -106,7 +109,10 @@ class ApplicationState(OptionManager):
                     next_level = level[part] = {}
                 level = next_level
                 # __pragma__("nojsiter")
-            level[name] = v
+            if type(v) == object:
+                level[name+":"] = v
+            else:
+                level[name] = v
         return tree
 
     def _tree_to_options(self, tree):
@@ -116,7 +122,10 @@ class ApplicationState(OptionManager):
                 # __pragma__("nojsiter")
                 v = level[k]
                 if type(v) == object:
-                    yield from iter_tree(v, prefix+k+".")
+                    if k.endswith(":"):
+                        yield prefix+k[:-1], v  # __:opov
+                    else:
+                        yield from iter_tree(v, prefix+k+".")
                 else:
                     yield prefix+k, v
 

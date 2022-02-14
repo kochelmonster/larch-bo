@@ -41,9 +41,8 @@ require("./larch.bo.table.scss")
 
 class Table(Control):
     STATIC_LIMIT = 200   # below this row_count no virtual list
-    TOLERANCE = 7        # for better berformance
     row_count = 0
-    element = None
+    element = Cell()
     updated = Cell(0)
     control_handlers = {}
 
@@ -56,9 +55,6 @@ class Table(Control):
 
         self.row_start = self.row_end = 0
         """the row range of the display_block"""
-
-        self.virtual_mode = False
-        """If True, the table operates in virtual mode"""
 
         self.block_size = 1
         """the count of rows inside the display block"""
@@ -75,17 +71,19 @@ class Table(Control):
         parent.appendChild(el)
 
         self.process_layout()
-        self.reset_widths()
 
         self.header.complete_template(self.viewport)
         self.footer.complete_template(self.viewport)
+        el.addEventListener("scroll", self.on_scroll)
 
         el.table = self   # debug
         self.element = el
         self.render_frame()
+        self.reset_widths()
         self.start_provider()
 
     def reset_widths(self):
+        console.log("***reset_widths")
         self.viewport.style["grid-template-columns"] = " ".join(
             [f"{c.stretch}fr" if c.stretch else "auto" for c in self.stretchers])
 
@@ -170,52 +168,34 @@ class Table(Control):
         self.anchor.offset = 0
 
     def set_row_count(self, count):
-        self.element.removeEventListener("scroll", self.on_scroll)
-        if count < self.STATIC_LIMIT:
-            self.row_count = count
-            self.block_size = count  # still performant
-            self.update_row_templates()
-            self.virtual_mode = False
-            self.update_display()
-            return
+        self.row_count = count
 
-        update_block_size = False
-        if self.row_count < self.STATIC_LIMIT:
-            metrics = get_metrics()
+        metrics = get_metrics()
+        self.row_height = metrics.line_height
+
+        if count > self.STATIC_LIMIT:
+            # set block_size big enough to cover the screen
             self.block_size = int(2 * window.screen.height / metrics.line_height)
-            # enough to cover the screen
-            update_block_size = True
-            self.virtual_mode = False
-            self.row_count = count
-            self.update_row_templates()
-            self.update_display()
-            self.element.addEventListener("scroll", self.on_scroll)
-            self.columns = window.getComputedStyle(self.viewport)["grid-template-columns"]
-
-        elif self.row_end > count - 1:
-            # shorten the display
-            self.set_virtual_scroll_space(count)
-            self.row_count = count
-            self.update_display()
         else:
-            self.set_virtual_scroll_space(count)
-            self.row_count = count
+            self.block_size = count  # still performant
 
-        self.virtual_mode = True
+        self.update_row_templates()
+        self.update_display()
 
-        if update_block_size:
-            # we estimate the row height from the first rows
-            display_height = sum([section.getBoundingClientRect().height for section in self.rows])
-            self.row_height = display_height / (self.row_end - self.row_start)
+        # we estimate the row height from the first rows
+        display_height = sum([section.getBoundingClientRect().height for section in self.rows])
+        self.row_height = display_height / (self.row_end - self.row_start)
 
+        if count > self.STATIC_LIMIT:
+            self.columns = window.getComputedStyle(self.viewport)["grid-template-columns"]
             # change block_size to a more suitable value
-            self.block_size = int(2.5 * window.screen.height / self.row_height)
-            self.set_virtual_scroll_space(count)
-            self.update_row_templates()
-            self.update_display()
+            self.block_size = int(3 * window.screen.height / self.row_height)
+
+        self.set_virtual_scroll_space(count)
+        self.update_row_templates()
+        self.update_display()
 
     def set_virtual_scroll_space(self, count):
-        # self.virtual_scroll_space = min(self.row_height * count, 33000000)
         self.virtual_scroll_space = min(self.row_height * count, 800000)
         self.row_height = self.virtual_scroll_space / count
 
@@ -237,35 +217,33 @@ class Table(Control):
         # insert_new display_bloc
         self.fill_display_block(tmp)
         self.viewport.insertBefore(tmp, self.lower_scroll)
-
-        if self.virtual_mode:
-            self.update_scrollbar()
-
-        self.update_anchor()
+        self.update_scrollbar()
         self.updated += 1
 
-    def needs_display_update(self):
-        upper_row = self.upper_scroll.nextSibling.lbo_row
-        if upper_row < 0:
-            return True
+    def update_visible_range(self):
+        row_start = self.row_start
+        row_end = self.row_end
 
-        if self.row_start <= 0 or self.row_end >= self.row_count - 1:
-            return True
+        top = self.upper_scroll.getBoundingClientRect().bottom
+        bottom = self.lower_scroll.getBoundingClientRect().top
+        rect = self.element.getBoundingClientRect()
+        top_offset = rect.top - top
+        bottom_offset = bottom - rect.bottom
+        if (row_start <= self.anchor.row < row_end
+                and (top_offset < rect.height or bottom_offset < rect.height)):
+            self.update_anchor()
 
-        tolerance = self.TOLERANCE
-        if self.row_start - tolerance < upper_row < self.row_start + tolerance:
-            lower_row = self.lower_scroll.previousSibling.lbo_row
-            if self.row_end - tolerance < lower_row < self.row_end + tolerance:
-                return False
-
-        return True
-
-    def update_display(self):
         self.row_start = max(self.anchor.row - self.block_size//2, 0)
         self.row_end = min(self.row_start + self.block_size, self.row_count)
         self.row_start = max(self.row_end - self.block_size, 0)
+        return row_start != self.row_start or row_end != self.row_end
 
-        if self.needs_display_update():
+    def update_rows(self):
+        # self.row_start = max(self.anchor.row - self.block_size//2, 0)
+        # self.row_end = min(self.row_start + self.block_size, self.row_count)
+        # self.row_start = max(self.row_end - self.block_size, 0)
+        # if self.needs_data_update():
+        if self.update_visible_range():
             tmp = __new__(DocumentFragment())
             tmp.append.apply(tmp, self.viewport.querySelectorAll(".b"))
             el = tmp.firstElementChild
@@ -278,7 +256,7 @@ class Table(Control):
             self.fill_display_block(tmp)
             self.viewport.insertBefore(tmp, self.lower_scroll)
 
-            if self.virtual_mode:
+            if self.row_count > self.STATIC_LIMIT:
                 columns = window.getComputedStyle(self.viewport)["grid-template-columns"]
                 if columns != self.columns:
                     self.columns = columns
@@ -287,11 +265,11 @@ class Table(Control):
                     for size, c in zip(columns, self.stretchers):
                         tmp.append(f"{c.stretch}fr" if c.stretch else f"minmax({size}, auto)")
                     self.viewport.style["grid-template-columns"] = " ".join(tmp)
+            return True
 
-        if self.virtual_mode:
+    def update_display(self):
+        if self.update_rows():
             self.update_scrollbar()
-
-        self.update_anchor()
         self.updated += 1
 
     def update_scrollbar(self):
@@ -301,8 +279,7 @@ class Table(Control):
 
         element_rect = self.element.getBoundingClientRect()
         top_section = self.rows[0]
-        row_start = top_section.lbo_row
-        anchor = self.rows[self.anchor.row - row_start]
+        anchor = self.rows[min(max(self.anchor.row - self.row_start, 0), len(self.rows)-1)]
 
         # inside the display block
         scroll_pos = (anchor.getBoundingClientRect().top
@@ -315,7 +292,7 @@ class Table(Control):
         relation = max(0, min(1, relation))
 
         row_end = self.rows[self.rows.length-1].lbo_row + 1
-        upper_space = row_start * self.row_height + delta * relation
+        upper_space = self.row_start * self.row_height + delta * relation
         lower_space = (self.row_count - row_end) * self.row_height + delta * (1-relation)
 
         self.upper_scroll.style.height = upper_space + "px"
@@ -327,7 +304,8 @@ class Table(Control):
         if delta_scroll:
             self.element.removeEventListener("scroll", self.on_scroll)
             self.element.scrollTop += delta_scroll
-            self.element.addEventListener("scroll", self.on_scroll)
+            def add_listener(): self.element.addEventListener("scroll", self.on_scroll)
+            window.requestAnimationFrame(add_listener)
 
     def update_anchor(self):
         rect = self.element.getBoundingClientRect()
@@ -340,7 +318,7 @@ class Table(Control):
 
     def fill_display_block(self, tmp):
         first = tmp.firstElementChild
-        has_placeholder = False
+        has_placeholder = None
         if first and self.row_start < first.lbo_row:
             data = self.provider.request(self.row_start, first.lbo_row)
             has_placeholder = "__placeholder__" in data[0]
@@ -364,9 +342,9 @@ class Table(Control):
                 tmp.append(self.body.render(self))
                 row += 1
 
-        if has_placeholder:
+        if has_placeholder is True:
             self.element.classList.add("placeholder")
-        else:
+        elif has_placeholder is False:
             self.element.classList.remove("placeholder")
 
         css_row = (self.header.row_count + 1   # one based
@@ -440,6 +418,15 @@ class Table(Control):
         provider.set_table(self)
         self.header.start()
         self.footer.start()
+
+    def get_state(self):
+        """"the tables state"""
+        return {"anchor": self.anchor}  # __:jsiter
+
+    def set_state(self, state):
+        anchor = state.anchor or self.anchor
+        self.anchor.row = anchor.row
+        self.anchor.offset = anchor.offset
 
 
 class TemplateBase:

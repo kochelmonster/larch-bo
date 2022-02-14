@@ -29,6 +29,7 @@ class CheckboxControl(MixinVaadin, MixinStyleObserver, Control):
         label = self.context.get("label-element")
         if label:
             label.setAttribute("for", self.element.inputElement.id)
+        self.update_styles()
 
     def on_change(self, event):
         self.context.value = self.element.checked

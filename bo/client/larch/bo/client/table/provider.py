@@ -18,12 +18,19 @@ class TableDataProvider:
     def request(self, start, end):
         raise NotImplementedError()
 
+    def save_state(self, state):
+        window.lbo.state.set(self.table.context.get("id"), "table", state)
+
+    def load_state(self):
+        return window.lbo.state.get(self.table.context.get("id"), "table")
+
 
 class ListDataProvider(TableDataProvider):
     # __pragma__("kwargs")
     def __init__(self, table):
         # __pragma__("nokwargs")
         self.table = table
+        self.table.set_state(self.load_state())
         self.table.set_row_count(len(self.table.context.value))
 
     def request(self, start, end):
@@ -54,11 +61,14 @@ class DelayedDataProvider(TableDataProvider):
         raise NotImplementedError()
 
     def resolve_data(self):
+        state = self.load_state()
+
         data = self.get_data()
         if data is None:
             def receive(data):
                 self.promise = None
                 self.set_data(data)
+                self.table.set_state(state)
                 self.table.set_row_count(len(data))
                 self.table.update_data()
 
@@ -67,6 +77,7 @@ class DelayedDataProvider(TableDataProvider):
                 self.promise = self.load_data()
             self.promise.then(receive)
         else:
+            self.table.set_state(state)
             self.table.set_row_count(len(data))
 
     def request(self, start, end):
@@ -101,10 +112,15 @@ class DelayedChunkProvider(TableDataProvider):
     def set_table(cls, table):
         table.provider = cls(table)
         container = table.provider.make_chunk_container()
-        if container.count is None:
-            table.set_row_count(table.provider.PLACEHOLDER_COUNT)  # the place holder
-        else:
-            table.set_row_count(container.count)
+        state = table.provider.load_state()
+
+        count = container.count or state.count or table.provider.PLACEHOLDER_COUNT
+        table.set_state(state)
+        table.set_row_count(count)
+
+    def save_state(self, state):
+        state.count = self.table.row_count
+        super().save_state(state)
 
     def make_chunk_container(self):
         container = self.__class__.data_chunks

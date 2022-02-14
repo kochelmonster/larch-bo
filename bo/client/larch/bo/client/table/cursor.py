@@ -141,11 +141,27 @@ class MixinCursor:
 
             if rect.top < min_top:
                 self.element.scrollBy(0, rect.top-min_top)
+
+            self.update_anchor()
+            self.updated += 1
         else:
             # outside the display block
             self.anchor.row = self.cursor
             self.anchor.offset = 0
             self.update_display()
+
+    def get_state(self):
+        state = super().get_state()
+        state["cursor"] = self.cursor
+        return state
+
+    def set_state(self, state):
+        super().set_state(state)
+        self.cursor = state.cursor or self.cursor
+
+    def set_row_count(self, count):
+        self.cursor = min(self.cursor, count-1)
+        super().set_row_count(count)
 
     @rule
     def _rule_update_cursor(self):

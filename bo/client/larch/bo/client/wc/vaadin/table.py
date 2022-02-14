@@ -17,11 +17,11 @@ class TableCheckbox:
     def create_template(self, parent):
         box = document.createElement(self.TAG)
         parent.appendChild(box)
+        parent.classList.add("selector")
 
     def render(self, parent):
         parent.firstChild.addEventListener("change", self.on_change)
         parent.firstChild.checked = self.grid.is_selected(parent.lbo_row)
-        parent.classList.add("selector")
         parent.update_selector = self.update_selector
 
     def update_selector(self, parent):

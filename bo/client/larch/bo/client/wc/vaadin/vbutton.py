@@ -28,6 +28,7 @@ class ButtonControl(MixinVaadin, MixinStyleObserver, Control):
         self.set_default_label()
         self.set_default_icons()
         self.set_default_tooltip()
+        self.update_styles()
 
     def on_click(self, event):
         self.context.value()

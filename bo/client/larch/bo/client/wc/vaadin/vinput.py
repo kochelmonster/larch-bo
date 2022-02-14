@@ -39,6 +39,7 @@ class TextControl(MixinLiveTracker, MixinVaadin, MixinStyleObserver, Control):
             label.setAttribute("for", self.element.inputElement.id)
 
         element.addEventListener("change", self.on_change)
+        self.update_styles()
 
     def on_change(self, event):
         self.context.value = self.html_to_python(self.element.value)
@@ -46,9 +47,9 @@ class TextControl(MixinLiveTracker, MixinVaadin, MixinStyleObserver, Control):
     def get_poll_value(self):
         return self.html_to_python(self.element.value)
 
-    def update_styles(self):
-        super().update_styles()
-        for value in self.context.loop("autocomplete"):
+    def update_styles(self, force=False):
+        super().update_styles(force)
+        for value in self.context.loop("autocomplete", force):
             self.element.autocomplete = value
 
     def html_to_python(self, value):

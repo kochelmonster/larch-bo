@@ -147,7 +147,7 @@ class OptionManager(Reactive):
         return self.get(name)
 
     def loop(self, name):
-        """like observer but is a genrator that only yields if the value has changed"""
+        """like observer but is a generator that only yields if the value has changed"""
         if rcontext.inside_rule:
             # transform to container
             self._observed_changed   # touch
@@ -163,8 +163,6 @@ class OptionManager(Reactive):
                 else:
                     # the first time called
                     self.observed[name] = -1
-                    if value is not None:
-                        return [value]
             return []
 
         value = self.get(name)

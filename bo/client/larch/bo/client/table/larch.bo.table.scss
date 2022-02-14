@@ -26,6 +26,12 @@
     }
   }
 
+  &.hide-selector {
+    .selector {
+      display: none
+    }
+  }
+
   > div {
     display: grid;
     justify-content: start;

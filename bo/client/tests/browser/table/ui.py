@@ -2,14 +2,21 @@ from larch.reactive import Cell, rule, Reactive
 from larch.bo.client.wc.vaadin import vbutton, vinput, vcheckbox, vswitch, vdate, styles, table
 from larch.bo.client.grid import Grid
 from larch.bo.client.i18n import create_number_painter
-from larch.bo.client.table import Table, provider, cursor, selection
+from larch.bo.client.table import Table, provider, cursor, selection, state
 from larch.bo.client.command import MixinCommandHandler, command
 from larch.bo.client.browser import start_main
 from larch.bo.client.session import Session
 from larch.bo.client.control import register
 
+
 # __pragma__("skip")
-window = document = console = styles
+class Console:
+    def log(self, *args):
+        pass
+
+
+window = document = styles
+console = Console()
 def require(path): pass
 def __pragma__(*args): pass
 # __pragma__("noskip")
@@ -35,7 +42,7 @@ Toggle Loader|[.chunked]@switch
     disabled = Cell(False)
     readonly = Cell(False)
     count = Cell(500)
-    chunked = Cell(False)
+    chunked = Cell(True)
 
     @rule
     def _rule_change_count(self):
@@ -101,7 +108,7 @@ class ChunkedEmployeeLoader(provider.DelayedChunkProvider):
 
 
 @register(EmployeeLoader)
-class Employees(cursor.MixinCursor, MixinCommandHandler, Table):
+class Employees(state.MixinState, cursor.MixinCursor, MixinCommandHandler, Table):
     layout = """
     Emplyoees{c}
 Id       |Name      | Office     |Age          |Start      |Salary           |Address
@@ -153,7 +160,8 @@ Id       |Name      | Office     |Age          |Start      |Salary           |Ad
 
 
 @register(ChunkedEmployeeLoader)
-class ChunkedEmployees(selection.MixinSelection, MixinCommandHandler, Table):
+class ChunkedEmployees(state.MixinState, selection.MixinToggleSelector,
+                       selection.MixinSelection, MixinCommandHandler, Table):
     layout = """
     Emplyoees{c}
 *    |Id       |Name      | Office     |Age         |Start      |Salary         |Address
@@ -178,9 +186,6 @@ class ChunkedEmployees(selection.MixinSelection, MixinCommandHandler, Table):
     def open(self):
         context = self.get_event_context()
         console.log("***open", context)
-
-    def set_count(self, count):
-        pass
 
 
 class Frame(Grid):

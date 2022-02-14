@@ -222,6 +222,10 @@ class MixinSplitter:
         self.resize_observer.unobserve(self.element)
         super().unlink()
 
+    def render(self, parent):
+        super().render(parent)
+        self.load_state()
+
     def _on_splitter_resize(self, entries):
         self.hide_splitters()
         self.hide_splitters.flush()
@@ -260,16 +264,14 @@ class MixinSplitter:
         for s in self.splitters:
             s.hide()
 
+    def load_state(self):
+        state = window.lbo.state.loop(self.context.get("id"), "splitter")
+        if state is not None:
+            for state, splitter in zip(state, self.splitters):
+                splitter.set_state(state)
+
     @rule
     def _rule_init_splitters(self):
         if self.element:
             yield
             self.init_splitters()
-
-    @rule
-    def _rule_update_splitter_state(self):
-        if self.element:
-            yield
-            for state in window.lbo.state.loop(self.context.get("id"), "splitter"):
-                for state, splitter in zip(state, self.splitters):
-                    splitter.set_state(state)
