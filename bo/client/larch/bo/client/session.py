@@ -70,7 +70,12 @@ class ApplicationState(OptionManager):
         packed = None
         __pragma__('js', '{}', '''
         try {
-            packed = new Uint8Array(Buffer.from(window.location.hash.slice(1), "base64"));
+            var binary_string = window.atob(window.location.hash.slice(1));
+            var len = binary_string.length;
+            packed = new Uint8Array(len);
+            for (var i = 0; i < len; i++) {
+                packed[i] = binary_string.charCodeAt(i);
+            }
         } catch(error) {
             console.warn("Cannot decode hash", error);
         }

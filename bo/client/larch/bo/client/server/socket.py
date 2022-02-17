@@ -16,7 +16,7 @@ def create_decoder(d): pass
 # __pragma__("noskip")
 
 
-msgpack = require("msgpack-lite")
+msgpack = require("msgpack-lite/dist/msgpack.min.js")
 
 
 __pragma__('js', '{}', '''
