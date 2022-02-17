@@ -187,7 +187,7 @@ class MixinSelection(MixinCursor):
 
     def set_state(self, state):
         super().set_state(state)
-        self.selection = state.selection or self.selection
+        self.selection = (state and state.selection) or self.selection
 
 
 class MixinToggleSelector:

@@ -114,7 +114,7 @@ class DelayedChunkProvider(TableDataProvider):
         container = table.provider.make_chunk_container()
         state = table.provider.load_state()
 
-        count = container.count or state.count or table.provider.PLACEHOLDER_COUNT
+        count = container.count or (state and state.count) or table.provider.PLACEHOLDER_COUNT
         table.set_state(state)
         table.set_row_count(count)
 

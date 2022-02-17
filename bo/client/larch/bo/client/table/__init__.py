@@ -25,6 +25,7 @@ from larch.reactive import rule, Cell, Reactive
 from ..i18n import HTML
 from ..control import Control
 from ..browser import get_metrics
+from ..js.debounce import debounce
 from .parser import TableParser
 from .provider import TableDataProvider
 
@@ -61,6 +62,8 @@ class Table(Control):
 
         self.rows = []
 
+        self.update_columns = debounce(self.update_columns, 100)
+
     def render(self, parent):
         self.context.control = self
         el = document.createElement("div")
@@ -83,7 +86,6 @@ class Table(Control):
         self.start_provider()
 
     def reset_widths(self):
-        console.log("***reset_widths")
         self.viewport.style["grid-template-columns"] = " ".join(
             [f"{c.stretch}fr" if c.stretch else "auto" for c in self.stretchers])
 
@@ -175,10 +177,11 @@ class Table(Control):
 
         if count > self.STATIC_LIMIT:
             # set block_size big enough to cover the screen
-            self.block_size = int(2 * window.screen.height / metrics.line_height)
+            self.block_size = int(3 * window.screen.height / self.row_height)
         else:
             self.block_size = count  # still performant
 
+        self.set_virtual_scroll_space(count)
         self.update_row_templates()
         self.update_display()
 
@@ -233,7 +236,8 @@ class Table(Control):
                 and (top_offset < rect.height or bottom_offset < rect.height)):
             self.update_anchor()
 
-        self.row_start = max(self.anchor.row - self.block_size//2, 0)
+        block = min(self.block_size // 4, 10)
+        self.row_start = max(block*(self.anchor.row//block) - self.block_size//2, 0)
         self.row_end = min(self.row_start + self.block_size, self.row_count)
         self.row_start = max(self.row_end - self.block_size, 0)
         return row_start != self.row_start or row_end != self.row_end
@@ -255,17 +259,19 @@ class Table(Control):
 
             self.fill_display_block(tmp)
             self.viewport.insertBefore(tmp, self.lower_scroll)
-
             if self.row_count > self.STATIC_LIMIT:
-                columns = window.getComputedStyle(self.viewport)["grid-template-columns"]
-                if columns != self.columns:
-                    self.columns = columns
-                    columns = columns.split(" ")
-                    tmp = []
-                    for size, c in zip(columns, self.stretchers):
-                        tmp.append(f"{c.stretch}fr" if c.stretch else f"minmax({size}, auto)")
-                    self.viewport.style["grid-template-columns"] = " ".join(tmp)
+                self.update_columns()
             return True
+
+    def update_columns(self):
+        columns = window.getComputedStyle(self.viewport)["grid-template-columns"]
+        if columns != self.columns:
+            self.columns = columns
+            columns = columns.split(" ")
+            tmp = []
+            for size, c in zip(columns, self.stretchers):
+                tmp.append(f"{c.stretch}fr" if c.stretch else f"minmax({size}, auto)")
+            self.viewport.style["grid-template-columns"] = " ".join(tmp)
 
     def update_display(self):
         if self.update_rows():
@@ -273,7 +279,13 @@ class Table(Control):
         self.updated += 1
 
     def update_scrollbar(self):
-        real_height = sum([section.getBoundingClientRect().height for section in self.rows])
+        real_height = 0
+        for section in self.rows:
+            height = section.row_height
+            if not height:
+                height = section.row_height = section.getBoundingClientRect().height
+            real_height += height
+
         virtual_height = self.row_height * self.rows.length
         delta = virtual_height - real_height
 
@@ -302,10 +314,7 @@ class Table(Control):
         aoffset = anchor.getBoundingClientRect().top - element_rect.top - self.header.height
         delta_scroll = int(aoffset - self.anchor.offset)
         if delta_scroll:
-            self.element.removeEventListener("scroll", self.on_scroll)
             self.element.scrollTop += delta_scroll
-            def add_listener(): self.element.addEventListener("scroll", self.on_scroll)
-            window.requestAnimationFrame(add_listener)
 
     def update_anchor(self):
         rect = self.element.getBoundingClientRect()
@@ -424,7 +433,7 @@ class Table(Control):
         return {"anchor": self.anchor}  # __:jsiter
 
     def set_state(self, state):
-        anchor = state.anchor or self.anchor
+        anchor = (state and state.anchor) or self.anchor
         self.anchor.row = anchor.row
         self.anchor.offset = anchor.offset
 

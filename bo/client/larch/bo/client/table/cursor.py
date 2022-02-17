@@ -157,7 +157,7 @@ class MixinCursor:
 
     def set_state(self, state):
         super().set_state(state)
-        self.cursor = state.cursor or self.cursor
+        self.cursor = (state and state.cursor) or self.cursor
 
     def set_row_count(self, count):
         self.cursor = min(self.cursor, count-1)
