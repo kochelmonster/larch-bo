@@ -99,7 +99,6 @@ class DelayedChunkProvider(TableDataProvider):
     }
     """
 
-    PLACEHOLDER_COUNT = 30
     PLACEHOLDER = None
     """must be set by child classes, a record for placeholder data,
     must contain a "__placeholder__" field"""
@@ -114,9 +113,15 @@ class DelayedChunkProvider(TableDataProvider):
         container = table.provider.make_chunk_container()
         state = table.provider.load_state()
 
-        count = container.count or (state and state.count) or table.provider.PLACEHOLDER_COUNT
+        count = (container.count or (state and state.count)
+                 or table.provider.calc_placeholder_count(state))
         table.set_state(state)
         table.set_row_count(count)
+
+    def calc_placeholder_count(self, state):
+        if state.anchor:
+            return (1 + (state.anchor.row or 0) / 1000) * 1000
+        return 1000
 
     def save_state(self, state):
         state.count = self.table.row_count
@@ -140,6 +145,7 @@ class DelayedChunkProvider(TableDataProvider):
     def request_chunk(self, row):
         container = self.make_chunk_container()
         if not container.promises[row]:
+            console.log("***load chunk", row)
             container.promises[row] = self.load_chunk(row).then(self.receive)
 
     def receive(self, chunk):
@@ -150,8 +156,8 @@ class DelayedChunkProvider(TableDataProvider):
         container.count = chunk.count
         if chunk.count != self.table.row_count:
             self.table.set_row_count(chunk.count)
-        if (self.table.row_start < chunk.start + chunk.chunk_size
-                and chunk.start < self.table.row_end):
+        range_ = self.table.get_display_range()
+        if range_[0] < chunk.start + chunk.chunk_size and chunk.start < range_[1]:
             self.table.update_data()
 
     def request(self, start, end):

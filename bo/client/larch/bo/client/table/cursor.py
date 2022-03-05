@@ -44,7 +44,7 @@ class MixinCursor:
     def cursor_pagedown(self):
         cursor = self.get_pagedown_position()
         if cursor is not None:
-            self.set_cursor(cursor)
+            self.set_cursor(cursor, True)
 
     @command(key="pointerdown-0")
     def cursor_mouse(self):
@@ -67,35 +67,17 @@ class MixinCursor:
         return -4
 
     def get_pageup_position(self):
-        start = self.rows[0].lbo_row
-        row = self.rows[self.cursor-start]
-        if row:
-            top = row.getBoundingClientRect().top
-            height = self.element.clientHeight - self.header.height - self.footer.height
-            r = self.cursor - start
-            for r in range(self.cursor-1-start, -1, -1):
-                if top - self.rows[r].getBoundingClientRect().top >= height:
-                    break
-            return r + start
-        return None
+        height = self.element.clientHeight - self.header.height - self.footer.height
+        return max(int(self.cursor - height/self.current_row_height), 0)
 
     def get_pagedown_position(self):
-        start = self.rows[0].lbo_row
-        row = self.rows[self.cursor-start]
-        if row:
-            top = row.getBoundingClientRect().top
-            height = self.element.clientHeight - self.header.height - self.footer.height
-            r = self.cursor - start
-            for r in range(self.cursor+1-start, self.rows.length):
-                if self.rows[r].getBoundingClientRect().top - top >= height:
-                    break
-            return r + start
-        return None
+        height = self.element.clientHeight - self.header.height - self.footer.height
+        return min(int(self.cursor + height/self.current_row_height), self.row_count - 1)
 
-    def set_cursor(self, cursor):
+    def set_cursor(self, cursor, bottom=False):
         cursor = min(max(cursor, 0), self.row_count-1)
         self.cursor = cursor
-        self.scroll_to_cursor()
+        self.scroll_to_cursor(bottom)
         return cursor
 
     def get_event_context(self):
@@ -125,7 +107,7 @@ class MixinCursor:
     def get_tab_elements(self):
         return [self.element]
 
-    def scroll_to_cursor(self):
+    def scroll_to_cursor(self, bottom=False):
         start = self.rows[0].lbo_row
         row = self.rows[self.cursor-start]
         if row:
@@ -147,8 +129,13 @@ class MixinCursor:
         else:
             # outside the display block
             self.anchor.row = self.cursor
-            self.anchor.offset = 0
-            self.update_display()
+            if bottom:
+                self.anchor.offset = max_bottom-min_top-1
+                self.update_display()
+                self.scroll_to_cursor()
+            else:
+                self.anchor.offset = 0
+                self.update_display()
 
     def get_state(self):
         state = super().get_state()

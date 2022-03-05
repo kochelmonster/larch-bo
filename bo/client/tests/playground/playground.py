@@ -26,10 +26,32 @@ if __name__ == "__main__":
 # ---------------------------------------------------
 # __pragma__ ("noskip")
 
-# __pragma__ ("jsiter")
-obj = {"a": 1, "b": 2, "c": {"a": 1}}
-a = []
 
-for k in obj:
-    # __pragma__ ("nojsiter")
-    console.log("item", k, obj[k], type(obj[k]).__name__, type(obj[k]) == object)
+class Test:
+    data = [1, 2, 3]
+
+
+class TestChild(Test):
+    pass
+
+
+class TestChild2(Test):
+    pass
+
+
+t1 = TestChild()
+console.log("t1.1", t1.data, [1, 2, 3])
+
+t1.__class__.data = [4, 5, 6]
+console.log("t1.2", t1.data, [4, 5, 6])
+
+t2 = TestChild2()
+console.log("t2.1", t2.data, [1, 2, 3])
+
+t3 = TestChild()
+console.log("t3.1", t3.data, [4, 5, 6])
+
+t1.data = [7, 8, 9]
+console.log("t1.3", t1.data, [7, 8, 9])
+console.log("t2.2", t2.data, [1, 2, 3])
+console.log("t3.2", t3.data, [4, 5, 6])

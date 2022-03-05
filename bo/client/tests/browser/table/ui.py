@@ -42,7 +42,7 @@ Toggle Loader|[.chunked]@switch
     disabled = Cell(False)
     readonly = Cell(False)
     count = Cell(500)
-    chunked = Cell(True)
+    chunked = Cell(False)
 
     @rule
     def _rule_change_count(self):
