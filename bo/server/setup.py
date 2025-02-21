@@ -1,7 +1,7 @@
 """
 larch browser objects server package.
 """
-from setuptools import setup, find_packages
+from setuptools import setup, find_namespace_packages
 
 
 dependencies = [
@@ -15,11 +15,8 @@ dependencies = [
 setup(
     name='larch-browser-objects-server',
     version="0.0.1",
-    # Project uses reStructuredText, so ensure that the docutils get
-    # installed or upgraded on the target machine
-    packages=find_packages(),
     install_requires=dependencies,
-    namespace_packages=['larch', "larch.bo"],
+    packages=find_namespace_packages(where="./", include=["larch.bo", "larch.bo.api", "larch.bo.server"]),
 
     # metadata for upload to PyPI
     author='Michael Reithinger',
@@ -27,5 +24,5 @@ setup(
     description='A transcrypt react ui library, server components',
     license='GNU',
     keywords='library',
-    url='http://example.com/larch-bo/',   # project home page, if any
+    url='https://github.com/kochelmonster/larch-bo',   # project home page, if any
     )

@@ -1,17 +1,20 @@
 # import larch.lib.adapter as adapter
-from larch.bo.client.vaadin.vinput import register as input_register
+from larch.reactive import Cell, rule
+from larch.bo.client.wc.vaadin.vinput import register as input_register
 from larch.bo.client.grid import Grid
 from larch.bo.client.session import Session
-from larch.bo.client.browser import start_main
-from larch.reactive import Cell, rule
+#from larch.bo.client.browser import start_main
+import larch.bo.client.browser as browser
+
+start_main = browser.start_main
 
 # __pragma__("skip")
 # ---------------------------------------------------
 import sys
 from logging import getLogger
 from larch.lib.test import config_logging
-# from larch.bo.server import run
-from larch.bo.qt import run
+from larch.bo.server import run
+# from larch.bo.qt import run
 from pathlib import Path
 
 window = document = console = None

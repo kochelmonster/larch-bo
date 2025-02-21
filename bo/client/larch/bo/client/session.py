@@ -49,7 +49,7 @@ class ApplicationState(OptionManager):
         return OptionManager.observe.call(self, f"{control_id}.{item_id}")
 
     def synch_to_hash(self):
-        # pack the optins in atree to save string space
+        # pack the options in a tree to save string space
         tree = self._options_to_tree()
         self._encode_to_hash(tree)
 
