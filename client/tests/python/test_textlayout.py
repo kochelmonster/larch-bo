@@ -13,7 +13,7 @@ class GridLayoutTest(unittest.TestCase):
         p = self.parse("""a|(10,1)|[b]""")
         self.assertEqual(
             repr(p.rows),
-            "[[<Label a-(0, 0),(0, 0){}>, <Spacer-(1, 1),(0, 0)>, <Field b-(2, 2),(0, 0){}>]]")
+            "[[<Label a-(0, 0),(0, 0){}>, <Spacer spacer-1-0-(1, 1),(0, 0)>, <Field b-(2, 2),(0, 0){}>]]")
         self.assertEqual(p.row_count, 1)
         self.assertEqual(p.column_count, 3)
         self.assertEqual(repr(p.row_stretchers), "[<0>]")
@@ -22,16 +22,16 @@ class GridLayoutTest(unittest.TestCase):
     def test_case2(self):
         p = self.parse("""
 a  |(10,1)|[b]
-[c]|      |[d]|<1t>
+[c]|      |[d]|<1M>
    |  <1> |
 """)
+        
         self.assertEqual(
             repr(p.rows),
-            ("[[<Label a-(0, 0),(0, 0){}>, <Spacer-(1, 1),(0, 0)>, <Field b-(2, 2),(0, 0){}>], "
-             "[<Field c-(0, 0),(1, 1){}>, <Field d-(2, 2),(1, 1){}>]]"))
+            ("[[<Label a-(0, 0),(0, 0){}>, <Spacer spacer-1-0-(1, 1),(0, 0)>, <Field b-(2, 2),(0, 0){}>], [<Field c-(0, 0),(1, 1){}>, <Field d-(2, 2),(1, 1){}>]]"))
         self.assertEqual(p.row_count, 2)
         self.assertEqual(p.column_count, 3)
-        self.assertEqual(repr(p.row_stretchers), "[<0>, <1.0t>]")
+        self.assertEqual(repr(p.row_stretchers), "[<0>, <1.0M>]")
         self.assertEqual(repr(p.column_stretchers), "[<0>, <1.0>, <0>]")
 
     def test_case3(self):
@@ -39,18 +39,17 @@ a  |(10,1)|[b]
 a  |(10,1)|[b]
 [c]|      | "     |<1>
  " |      |[d]|[e]
-   | <1r> |   |<1>|
+   | <1M> |   |<1>|
 """)
 
         self.assertEqual(
             repr(p.rows),
-            ("[[<Label a-(0, 0),(0, 0){}>, <Spacer-(1, 1),(0, 0)>, <Field b-(2, 3),(0, 1){}>], "
-             "[<Field c-(0, 0),(1, 2){}>], "
-             "[<Field d-(2, 2),(2, 2){}>, <Field e-(3, 3),(2, 2){}>]]"))
+            ("[[<Label a-(0, 0),(0, 0){}>, <Spacer spacer-1-0-(1, 1),(0, 0)>, <Field b-(2, 3),(0, 1){}>], [<Field c-(0, 0),(1, 2){}>], [<Field d-(2, 2),(2, 2){}>, <Field e-(3, 3),(2, 2){}>]]"))
         self.assertEqual(p.row_count, 3)
         self.assertEqual(p.column_count, 4)
         self.assertEqual(repr(p.row_stretchers), "[<0>, <1.0>, <0>]")
-        self.assertEqual(repr(p.column_stretchers), "[<0>, <1.0r>, <0>, <1.0>]")
+        self.assertEqual(repr(p.column_stretchers),
+                         "[<0>, <1.0M>, <0>, <1.0>]")
 
     def test_case4(self):
         p = self.parse("""
@@ -68,7 +67,7 @@ ad:[active_displays[0]]{cm}|<1>
         p = self.parse("""a:a|(10,1)|b:[b]""")
         self.assertEqual(
             repr(p.rows),
-            "[[<Label a-(0, 0),(0, 0){}>, <Spacer-(1, 1),(0, 0)>, <Field b-(2, 2),(0, 0){}>]]")
+            "[[<Label a-(0, 0),(0, 0){}>, <Spacer spacer-1-0-(1, 1),(0, 0)>, <Field b-(2, 2),(0, 0){}>]]")
         self.assertEqual(p.row_count, 1)
         self.assertEqual(p.column_count, 3)
         self.assertEqual(repr(p.row_stretchers), "[<0>]")
@@ -181,7 +180,6 @@ class TableLayoutTest(unittest.TestCase):
     def test_layout3(self):
         parser = self.parse(TLAYOUT3)
         self.print_structure(parser)
-
 
 
 if __name__ == "__main__":

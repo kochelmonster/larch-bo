@@ -33,6 +33,12 @@ def additional_directories():
         # workaround for transcrypt
         import larch.lib.adapter
         dirs.append(str(Path(larch.lib.adapter.__file__).parents[2]))
+
+        import larch.bo.client
+        dirs.append(str(Path(larch.bo.client.__file__).parents[3]))
+
+        import larch.reactive
+        dirs.append(str(Path(larch.reactive.__file__).parents[2]))
     except ImportError:
         pass
     return dirs

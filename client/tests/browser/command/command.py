@@ -19,9 +19,11 @@ if __name__ == "__main__":
     config_logging("hello.log", __file__)
     dir_ = Path(__file__).parent
     config = {
-        "debug": False,
+        "debug": True,
     }
     sys.exit(run(__file__, config=config))
+
+
 # ---------------------------------------------------
 # __pragma__ ("noskip")
 

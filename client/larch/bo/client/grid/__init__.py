@@ -208,7 +208,7 @@ class Grid(Control):
                             tindex += 1
                         compiled.fields.append(c)
 
-            compiled.fields.sort(lambda c: int(c.tabindex))
+            compiled.fields.sort(key=lambda c: int(c.tabindex))
             compiled.template = self.create_template(parser, compiled)
             self.layout_to_cache(self.layout, compiled, parser)
 

@@ -1,28 +1,8 @@
 """
-larch browser objects server package.
+Legacy setup.py for larch-browser-objects-server.
+Modern Python packaging uses pyproject.toml as the canonical source of build and metadata configuration.
+This file is only for compatibility with legacy tools.
 """
-from setuptools import setup, find_namespace_packages
+from setuptools import setup
 
-
-dependencies = [
-    "gevent",
-    'Werkzeug>=0.8.3',
-    'msgpack',
-    "gevent-websocket @ git+https://gitlab.com/noppo/gevent-websocket.git",
-    "watchdog_gevent"]
-
-
-setup(
-    name='larch-browser-objects-server',
-    version="0.0.1",
-    install_requires=dependencies,
-    packages=find_namespace_packages(where="./", include=["larch.bo", "larch.bo.api", "larch.bo.server"]),
-
-    # metadata for upload to PyPI
-    author='Michael Reithinger',
-    author_email='mreithinger@web.de',
-    description='A transcrypt react ui library, server components',
-    license='GNU',
-    keywords='library',
-    url='https://github.com/kochelmonster/larch-bo',   # project home page, if any
-    )
+setup()

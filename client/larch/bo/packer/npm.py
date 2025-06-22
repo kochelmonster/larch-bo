@@ -16,7 +16,7 @@ def find_node_modules_path(sub_path, start):  # pragma: no cover
 
 
 def make(package_name, start=__file__):  # pragma: no cover
-    """check if sub_path exists under the node_modules hierachy beginning
+    """check if sub_path exists under the node_modules hierarchy beginning
     at start. If the sub_path is not found npm is called to install
     package_name.
 

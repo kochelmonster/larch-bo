@@ -1,3 +1,5 @@
+build
+.vscode
 .lfrontend
 __pycache__
 *.egg-info

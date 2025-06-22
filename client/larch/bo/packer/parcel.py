@@ -138,15 +138,28 @@ def watch(linker):
            '--no-hmr --log-level=verbose --watch-for-stdin')
     try:
         print("**start parcel watch")
-        process = subprocess.Popen(
-            cmd, shell=True, cwd=build_path, env=environ, stdin=subprocess.PIPE)
-        process.wait()
-        print("done parcel", process.returncode)
-        signal.raise_signal(signal.SIGINT)
+        import platform
+        if hasattr(os, "posix_spawn") and platform.system() != "Windows":
+            # Prepare arguments for exec
+            args = ["/bin/sh", "-c", cmd]
+            # Change working directory before spawning
+            old_cwd = os.getcwd()
+            try:
+                os.chdir(build_path)
+                pid = os.posix_spawn(args[0], args, environ)
+            finally:
+                os.chdir(old_cwd)
+            _, status = os.waitpid(pid, 0)
+            returncode = os.WEXITSTATUS(status)
+            print("done parcel", returncode)
+            signal.raise_signal(signal.SIGINT)
+        else:
+            result = subprocess.run(
+                cmd, shell=True, cwd=build_path, env=environ, stdin=subprocess.PIPE)
+            print("done parcel", result.returncode)
+            signal.raise_signal(signal.SIGINT)
     finally:
-        process.stdin.close()
-        process.wait(1)
-        process.kill()
+        pass
 
 
 def start_watcher(linker, wait_for_change):

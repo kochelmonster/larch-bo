@@ -27,9 +27,11 @@ monkey.patch_all()
 class CheckFiles(FileSystemEventHandler):
     def __init__(self, files):
         self.changed_file = AsyncResult()
+        self.files = set(os.path.abspath(f) for f in files)
 
     def on_modified(self, event):
-        self.changed_file.set(event.src_path)
+        if os.path.abspath(event.src_path) in self.files:
+            self.changed_file.set(event.src_path)
 
 
 system_greenlets = []
@@ -87,14 +89,18 @@ def restart_with_reloader():
         print("restart with reloader child process exit", exit_code)
         if exit_code != 7:
             return exit_code
-
+        
 
 def wait_for_change(files):
     event_handler = CheckFiles(files)
 
     observer = Observer()
+    watched_dirs = set()
     for f in files:
-        observer.schedule(event_handler, f, False)
+        dirpath = os.path.dirname(f)
+        if dirpath not in watched_dirs:
+            observer.schedule(event_handler, dirpath, recursive=False)
+            watched_dirs.add(dirpath)
 
     observer.start()
     try:
@@ -119,6 +125,8 @@ def reloader_loop(extra_files=None, interval=1):
 
 
 def _iter_module_files():
+    import pkg_resources
+    
     # The list call is necessary on Python 3 in case the module
     # dictionary modifies during iteration.
     for module in list(sys.modules.values()):
@@ -133,7 +141,16 @@ def _iter_module_files():
             else:
                 if filename[-4:] in ('.pyc', '.pyo'):
                     filename = filename[:-1]
-                yield filename
+                if ".vscode" not in filename:
+                    yield filename
+
+    # Add editable modules (PEP 660, .egg-link, etc.)
+    for dist in pkg_resources.working_set:
+        if dist.location and os.path.isdir(dist.location):
+            for root, dirs, files in os.walk(dist.location):
+                for file in files:
+                    if file.endswith('.py'):
+                        yield os.path.join(root, file)
 
 
 class ObjectTracer(object):
@@ -192,6 +209,7 @@ def profile_find_double_rendering():
     """monkey patch session to find multiple renderings of one view.
     This may be a performance issue"""
     from larch.ui.viewer import View
+    
     global _patched_double_rendering
 
     if _patched_double_rendering:

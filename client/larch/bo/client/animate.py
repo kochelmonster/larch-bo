@@ -36,13 +36,11 @@ animator = NoAnimator()
 
 __pragma__("else")
 
-
 anime = None
-
 
 __pragma__('js', '{}', '''
 loading_modules.push((async () => {
-    anime = await import("animejs/lib/anime.es.js");
+    anime = await import("animejs/lib/anime.esm.js");
 })());
 ''')
 

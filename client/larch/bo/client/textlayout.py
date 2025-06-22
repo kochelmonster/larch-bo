@@ -86,18 +86,25 @@ class Empty(Cell):
 
 
 class Stretcher(Cell):
-    EXPRESSION = re.compile(r"<(\d+)>")
+    EXPRESSION = re.compile(r"<(\d+)(M*)>")
 
     stretch = 0
     """stretch factor"""
 
-    def __init__(self, stretch=0):
-        self.stretch = stretch
+    moving = False
+    """if True the size of col/row can be changed by the user
+    (splitter control)"""
+
+    def __bool__(self):
+        return False
 
     @classmethod
     def create_cell(cls, mo):
-        return cls(float(mo.group(1)))
-
+        c = cls()
+        c.stretch = float(mo.group(1))
+        c.moving = mo.group(2) == "M"
+        return c
+    
 
 class RowSpan(Cell):
     EXPRESSION = re.compile(r'"')

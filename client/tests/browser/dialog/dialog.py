@@ -1,6 +1,6 @@
 # import larch.lib.adapter as adapter
 from larch.reactive import Cell, rule
-from larch.bo.client.vaadin import vinput, vbutton, vdialog
+from larch.bo.client.wc.vaadin import vinput, vbutton, vdialog
 from larch.bo.client.grid import Grid
 from larch.bo.client.grid.snippets import OkCancel
 from larch.bo.client.command import label
@@ -24,7 +24,7 @@ if __name__ == "__main__":
     config_logging("hello.log", __file__)
     dir_ = Path(__file__).parent
     config = {
-        "debug": False,
+        "debug": True,
     }
     sys.exit(run(__file__, config=config))
 # ---------------------------------------------------

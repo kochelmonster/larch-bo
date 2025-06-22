@@ -89,10 +89,12 @@ class ApplicationState(OptionManager):
 
         json = {}  # __:jsiter
         __pragma__('js', '{}', '''
-        try {
-            json = JSON.parse(atob(window.location.hash.slice(1)));
-        } catch(error) {
-            console.warn("Cannot decode hash", error, window.location.hash.slice(1));
+        if (window.location.hash && window.location.hash.length >= 2) {
+            try {
+                json = JSON.parse(atob(window.location.hash.slice(1)));
+            } catch(error) {
+                console.warn("Cannot decode hash", error, window.location.hash.slice(1));
+            }
         }
         ''')
 

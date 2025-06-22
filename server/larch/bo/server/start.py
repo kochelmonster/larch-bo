@@ -107,17 +107,17 @@ def run(root, config=None, application=None):
         def run_debug():
             run_server(application, config)
 
-        from .gevent.debug import run_with_reloader, wait_for_change, system_greenlets
+        from larch.bo.server.gevent.debug import run_with_reloader, wait_for_change, system_greenlets
         config.setdefault("build_path", Path(config["resource_path"]).parent)
         config["runtype"] = "debug"
         config['debug'] = True
 
-        if not os.environ.get('WERKZEUG_RUN_MAIN'):
-            from larch.bo.packer import start_watcher
-            # check_for_compile(config)
-            system_greenlets.extend(start_watcher(config, wait_for_change))
+        #if not os.environ.get('WERKZEUG_RUN_MAIN'):
+        from larch.bo.packer import start_watcher
+        system_greenlets.extend(start_watcher(config, wait_for_change))
 
-        return run_with_reloader(run_debug)
+        return run_server(application, config)
+        # return run_with_reloader(run_debug)
 
     return 1
 
