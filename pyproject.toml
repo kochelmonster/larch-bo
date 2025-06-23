@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools >= 64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "larch-bo"
+version = "0.1.0"
+description = "Unified larch-bo package (client, server, qt-application)"
+authors = [{ name = "Michael Reithinger", email = "mreithinger@web.de" }]
+license = { text = "BSD" }
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = [
+    "gevent",
+    "larch-lib @ git+https://github.com/kochelmonster/larch-lib.git@master",
+    "larch-reactive",
+    "werkzeug >= 2.3.0",
+    "msgpack >= 0.6.0",
+    "gevent-websocket >= 0.10.1",
+    "watchdog-gevent",
+    "transcrypt @ git+https://github.com/kochelmonster/Transcrypt.git@master",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["larch.bo*"]

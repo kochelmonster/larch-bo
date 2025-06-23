@@ -1,7 +1,8 @@
 build
 .vscode
+.venv
 .lfrontend
 __pycache__
-*.egg-info
+larch_bo.egg-info
 *.log
 *.code-workspace

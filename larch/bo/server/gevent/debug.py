@@ -21,15 +21,15 @@ logger = logging.getLogger('larch.bo.server.debug')
 del logging
 
 
-monkey.patch_all()
+monkey.patch_all(fork=False)
 
-
+ 
 class CheckFiles(FileSystemEventHandler):
     def __init__(self, files):
         self.changed_file = AsyncResult()
         self.files = set(os.path.abspath(f) for f in files)
 
-    def on_modified(self, event):
+    def on_any_event(self, event):
         if os.path.abspath(event.src_path) in self.files:
             self.changed_file.set(event.src_path)
 
@@ -95,13 +95,12 @@ def wait_for_change(files):
     event_handler = CheckFiles(files)
 
     observer = Observer()
-    watched_dirs = set()
+    watched_files = set()
     for f in files:
-        dirpath = os.path.dirname(f)
-        if dirpath not in watched_dirs:
-            observer.schedule(event_handler, dirpath, recursive=False)
-            watched_dirs.add(dirpath)
-
+        if "site-packages" not in f:
+            observer.schedule(event_handler, f, recursive=False)
+            watched_files.add(f)
+    
     observer.start()
     try:
         return event_handler.changed_file.get()

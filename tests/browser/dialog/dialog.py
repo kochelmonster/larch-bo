@@ -24,7 +24,8 @@ if __name__ == "__main__":
     config_logging("hello.log", __file__)
     dir_ = Path(__file__).parent
     config = {
-        "debug": True,
+        "debug": False,
+        "verbosity": 2
     }
     sys.exit(run(__file__, config=config))
 # ---------------------------------------------------

@@ -183,7 +183,7 @@ class Parser:
 
         """?
         self.rows = [
-            [c for _, c in sorted(r.items(), lambda i: int(i[0])) if bool(c)] for r in rows]
+            [c for _, c in sorted(r.items(), key=lambda i: int(i[0])) if bool(c)] for r in rows]
         ?"""
         self.rows = [[c for _, c in sorted(r.items()) if bool(c)] for r in rows]  # __: skip
         self._assign_borders()

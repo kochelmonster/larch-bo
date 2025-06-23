@@ -1,4 +1,5 @@
 from larch.reactive import rule, Cell
+from . import styles
 
 # __pragma__("skip")
 console = None

@@ -172,4 +172,5 @@ def start_watcher(linker, wait_for_change):
     if linker.transmitter and not (respath/linker.transmitter).exists():
         make(linker)
 
+    return []
     return [spawn(watch, linker)]

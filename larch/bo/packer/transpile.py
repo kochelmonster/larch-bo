@@ -28,20 +28,21 @@ def needs_transpile(linker):
 
 
 def additional_directories():
-    dirs = []
+    dirs = set()
     try:
         # workaround for transcrypt
         import larch.lib.adapter
-        dirs.append(str(Path(larch.lib.adapter.__file__).parents[2]))
+        dirs.add(str(Path(larch.lib.adapter.__file__).parents[2]))
 
         import larch.bo.client
-        dirs.append(str(Path(larch.bo.client.__file__).parents[3]))
+        dirs.add(str(Path(larch.bo.client.__file__).parents[3]))
 
         import larch.reactive
-        dirs.append(str(Path(larch.reactive.__file__).parents[2]))
+        dirs.add(str(Path(larch.reactive.__file__).parents[1]))
     except ImportError:
         pass
-    return dirs
+    
+    return [d for d in dirs if "site-packages" not in d]
 
 
 def transpile_transmitter(linker):
@@ -94,7 +95,7 @@ def transpile(linker):
     if verbosity >= 1:
         symbols.append("verbose1")
     if verbosity >= 2:
-        symbols.append("verbose1")
+        symbols.append("verbose2")
     if verbosity >= 3:
         symbols.append("verbose3")
 
@@ -187,12 +188,17 @@ def copy_resources(linker):
 
 def watch(linker, wait_for_change):
     print("**start watch transpile")
+
+    from .parcel import make as parcel_make
+
     while True:
         copy_resources(linker)
         sources = linker.context["python_sources"] | linker.context["resources"]
         wait_for_change(sources)
         print("**sources changed")
         transpile(linker)
+
+        parcel_make(linker)
 
 
 def start_watcher(linker, wait_for_change):
