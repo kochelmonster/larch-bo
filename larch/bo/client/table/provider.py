@@ -15,7 +15,7 @@ class TableDataProvider:
     def set_table(cls, table):
         table.provider = cls(table)
 
-    def request(self, start, end):
+    def request_data(self, start, end):
         raise NotImplementedError()
 
     def save_state(self, state):
@@ -33,7 +33,7 @@ class ListDataProvider(TableDataProvider):
         self.table.set_state(self.load_state())
         self.table.set_row_count(len(self.table.context.value))
 
-    def request(self, start, end):
+    def request_data(self, start, end):
         return self.table.context.value[start:end]
 
 
@@ -80,7 +80,7 @@ class DelayedDataProvider(TableDataProvider):
             self.table.set_state(state)
             self.table.set_row_count(len(data))
 
-    def request(self, start, end):
+    def request_data(self, start, end):
         data = self.get_data()
         if data:
             return data[start:end]
@@ -89,8 +89,8 @@ class DelayedDataProvider(TableDataProvider):
 
 class DelayedChunkProvider(TableDataProvider):
     """
-    This proider loads only the necessary chunks from server
-    the server has to deilver chunked data:
+    This provider loads only the necessary chunks from server
+    the server has to deliver chunked data:
     {
         count: int            # the complete data size
         chunk_size: int       # the size of chunks (must always be the same)
@@ -127,16 +127,23 @@ class DelayedChunkProvider(TableDataProvider):
         state.count = self.table.row_count
         super().save_state(state)
 
+    def get_chunks(self):
+        return self.__class__.data_chunks
+
+    def set_chunks(self, chunks):
+        self.__class__.data_chunks = chunks
+
     def make_chunk_container(self):
-        container = self.__class__.data_chunks
+        container = self.get_chunks()
         if not container:
             # __pragma__("jsiter")
-            container = self.__class__.data_chunks = {
+            container = {
                 "count": None,
                 "chunk_size": 1,
                 "promises": {}
             }
             # __pragma__("nojsiter")
+            self.set_chunks(container)
         return container
 
     def load_chunk(self, row):
@@ -160,11 +167,11 @@ class DelayedChunkProvider(TableDataProvider):
         if range_[0] < chunk.start + chunk.chunk_size and chunk.start < range_[1]:
             self.table.update_data()
 
-    def request(self, start, end):
+    def request_data(self, start, end):
+        return [self.PLACEHOLDER for i in range(start, end)]
         container = self.make_chunk_container()
         result = []
         chunk_size = container.chunk_size
-
         start_index = start % chunk_size
         chunk_start = int(start/chunk_size)*chunk_size
         for i in range(chunk_start, end, chunk_size):
@@ -175,4 +182,5 @@ class DelayedChunkProvider(TableDataProvider):
             else:
                 self.request_chunk(i)
                 return [self.PLACEHOLDER for i in range(start, end)]
+        # what happens if only part of the result is available?
         return result[:end-start]

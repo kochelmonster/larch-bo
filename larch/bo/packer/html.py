@@ -41,7 +41,7 @@ def make(linker):
     linker.config.setdefault("title", "Larch Bo")
     linker.config.setdefault("html_head", "")
 
-    root = linker.config["resource_path"]/Path(linker.config["root"]).name
+    root = linker.trans_path/Path(linker.config["root"]).name
 
     try:
         classic = linker.config["args"].classic
@@ -56,7 +56,7 @@ def make(linker):
         css_links=css_links, icons=make_icon_list(linker),
         js_links=js_links, **linker.config)
 
-    with open(linker.config["resource_path"]/"index.html", "w") as f:
+    with open(linker.trans_path/"index.html", "w") as f:
         f.write("".join(line.strip() for line in html.splitlines()))
 
 

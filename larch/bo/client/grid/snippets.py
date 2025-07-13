@@ -6,7 +6,7 @@ from . import Grid
 class OkCancel(Grid):
     i18n_context = "dialog"
     layout = """
-[.ok]|(1em,0)|[.cancel]
+[.ok]|(1ex,0)|[.cancel]
 """
 
     @label(pgettext("dialog", "Ok"))

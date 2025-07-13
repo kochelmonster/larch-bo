@@ -53,7 +53,12 @@ def check_for_compile(config):
 def patch_gevent(config):
     if DEFAULT_SERVER == config.get("wsgi_server", DEFAULT_SERVER):
         from gevent import monkey
+        import os
+        # avoid fork monkey_patch
+        tmp = os.register_at_fork
+        os.register_at_fork = None
         monkey.patch_all()
+        os.register_at_fork = tmp
         config["gevent"] = True
 
 
@@ -75,8 +80,8 @@ def run(root, config=None, application=None):
         root = module.__file__
 
     config["root"] = root
-    config.setdefault("resource_path", Path(
-        config.get("build_path") or Path.cwd().resolve()/".lfrontend")/"dist")
+    config.setdefault("build_path", Path.cwd().resolve()/".lfrontend")
+    config.setdefault("resource_path", Path(config.get("build_path"))/"dist")
 
     if os.environ.get("ANDROID_APP_PATH"):
         config["runtype"] = "android"
@@ -104,20 +109,17 @@ def run(root, config=None, application=None):
         check_for_compile(config)
         return run_tests(application, config)
     else:  # pragma: no cover
-        def run_debug():
-            run_server(application, config)
-
-        from larch.bo.server.gevent.debug import run_with_reloader, wait_for_change, system_greenlets
-        config.setdefault("build_path", Path(config["resource_path"]).parent)
+        from larch.bo.server.gevent.debug import wait_for_change, system_greenlets, kill_greenlets
         config["runtype"] = "debug"
         config['debug'] = True
 
         #if not os.environ.get('WERKZEUG_RUN_MAIN'):
         from larch.bo.packer import start_watcher
         system_greenlets.extend(start_watcher(config, wait_for_change))
-
-        return run_server(application, config)
-        # return run_with_reloader(run_debug)
+        try:
+            return run_server(application, config)
+        finally:
+            kill_greenlets()
 
     return 1
 

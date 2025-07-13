@@ -12,16 +12,12 @@ import time
 import site
 from itertools import chain
 from gevent.event import AsyncResult
-from gevent import subprocess, monkey, getcurrent, kill, signal, killall, spawn
 from watchdog_gevent import Observer
 from watchdog.events import FileSystemEventHandler
 from contextlib import contextmanager
 
 logger = logging.getLogger('larch.bo.server.debug')
 del logging
-
-
-monkey.patch_all(fork=False)
 
  
 class CheckFiles(FileSystemEventHandler):
@@ -38,58 +34,8 @@ system_greenlets = []
 
 
 def kill_greenlets(*args):
-    killall(system_greenlets)
+    gevent.killall(system_greenlets)
 
-
-def run_with_reloader(main_func, extra_files=None, interval=1):
-    """Run the given function in an independent python interpreter."""
-    if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
-        reloader_greenlet = getcurrent()
-        main_greenlet = gevent.spawn(main_func)
-
-        def kill_me(*args):
-            kill(reloader_greenlet)
-
-        main_greenlet.link(kill_me)
-        result = 1
-        try:
-            result = reloader_loop(extra_files, interval)
-        except BaseException:
-            return 1
-        finally:
-            main_greenlet.unlink(kill_me)
-            main_greenlet.kill()
-        return result
-
-    g = spawn(restart_with_reloader)
-    system_greenlets.append(g)
-    signal.signal(signal.SIGTERM, kill_greenlets)
-    return g.get(block=True)
-
-
-def restart_with_reloader():
-    """Spawn a new Python interpreter with the same arguments as this one,
-    but running the reloader thread.
-    """
-    while True:
-        logger.info("Restarting with reloader %r", os.getpid())
-        args = [sys.executable] + sys.argv
-        new_environ = os.environ.copy()
-        new_environ['WERKZEUG_RUN_MAIN'] = 'true'
-        try:
-            process = subprocess.Popen(args, env=new_environ)
-            process.wait()
-        except KeyboardInterrupt:
-            print("restart with reloader KeyboardInterrupt")
-            return 2
-        finally:
-            process.terminate()
-
-        exit_code = process.returncode
-        print("restart with reloader child process exit", exit_code)
-        if exit_code != 7:
-            return exit_code
-        
 
 def wait_for_change(files):
     event_handler = CheckFiles(files)

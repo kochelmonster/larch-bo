@@ -45,6 +45,9 @@ def init(config):
         logger.debug("init package %r", p)
         npm_make(p, start)
 
+    if config.get("transmitter"):
+        npm_make("msgpack-lite", start)
+
 
 def make_package_json(linker, directory, entry):
     package = loads(dumps(PACKAGE_TEMPLATE))  # deep copy
@@ -71,8 +74,7 @@ def patch_msgpack(script):
 
 def create_entries(linker):
     entry_paths = []
-
-    entry_paths.append(linker.path/"main")
+    entry_paths.append(linker.trans_path/"index.html")
     if linker.transmitter:
         entry_paths.append(linker.path/"transmitter")
 
@@ -91,8 +93,8 @@ def make(linker):
     environ["FORCE_COLOR"] = "3"
 
     for entry in create_entries(linker):
-        cmd = f'npx parcel build {entry} --dist-dir {linker.config["resource_path"]}'
-        cmd += " --no-content-hash"
+        cmd = (f'npx parcel build {entry} --dist-dir {linker.config["resource_path"]}'
+               f' --cache-dir {linker.config["build_path"]/".parcel-cache"}')
         if linker.config.get("debug"):
             cmd += " --no-optimize"
 
@@ -127,50 +129,3 @@ def make_strict(linker):
             js = f.read_text()
             if not js.startswith("'use strict'"):
                 f.write_text("'use strict';\n" + js)
-
-
-def watch(linker):
-    environ = os.environ.copy()
-    environ["FORCE_COLOR"] = "3"
-    build_path = linker.config["build_path"]
-    entry = create_entries(linker)[0]
-    cmd = (f'npx parcel watch {entry} --dist-dir {linker.config["resource_path"]} '
-           '--no-hmr --log-level=verbose --watch-for-stdin')
-    try:
-        print("**start parcel watch")
-        import platform
-        if hasattr(os, "posix_spawn") and platform.system() != "Windows":
-            # Prepare arguments for exec
-            args = ["/bin/sh", "-c", cmd]
-            # Change working directory before spawning
-            old_cwd = os.getcwd()
-            try:
-                os.chdir(build_path)
-                pid = os.posix_spawn(args[0], args, environ)
-            finally:
-                os.chdir(old_cwd)
-            _, status = os.waitpid(pid, 0)
-            returncode = os.WEXITSTATUS(status)
-            print("done parcel", returncode)
-            signal.raise_signal(signal.SIGINT)
-        else:
-            result = subprocess.run(
-                cmd, shell=True, cwd=build_path, env=environ, stdin=subprocess.PIPE)
-            print("done parcel", result.returncode)
-            signal.raise_signal(signal.SIGINT)
-    finally:
-        pass
-
-
-def start_watcher(linker, wait_for_change):
-    main_name = Path(linker.config["root"]).with_suffix(".js")
-    make_package_json(linker, "main", main_name.name)
-    if linker.transmitter:
-        make_package_json(linker, "transmitter", linker.transmitter)
-
-    respath = linker.config["resource_path"]
-    if linker.transmitter and not (respath/linker.transmitter).exists():
-        make(linker)
-
-    return []
-    return [spawn(watch, linker)]

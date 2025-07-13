@@ -4,7 +4,7 @@ import logging
 import json
 import shutil
 from pathlib import Path
-from gevent import spawn, subprocess
+from gevent import subprocess
 
 logger = logging.getLogger("larch.bo.packer")
 
@@ -78,8 +78,7 @@ def transpile_transmitter(linker):
 def transpile(linker):
     logger.info("transpile python %r\n%r", linker.path, linker.config)
 
-    dstpath = linker.path / "main"
-    cmd = f'python -m transcrypt --nomin --map --verbose -od {dstpath} {linker.config["root"]}'
+    cmd = f'python -m transcrypt --nomin --map --verbose -od {linker.trans_path} {linker.config["root"]}'
     dirs = list(linker.config.get("extra_search_path", [])) + additional_directories()
     if dirs:
         dirs = " ".join("-xp " + d.replace(" ", "#") for d in dirs)
@@ -155,7 +154,7 @@ def extend_manifest(linker):
 
 def get_project_file(linker):
     name = Path(linker.config["root"]).stem + ".project"
-    return linker.path/"main"/name
+    return linker.trans_path/name
 
 
 def read_project_file(linker):
@@ -180,26 +179,8 @@ def copy_resources(linker):
                 # a global package
                 continue
 
-            dest_path = linker.path/"main"/require
+            dest_path = linker.trans_path/require
             resources.add(str(require_path))
             if not dest_path.exists() or require_path.stat().st_mtime > dest_path.stat().st_mtime:
                 shutil.copy(require_path, dest_path)
 
-
-def watch(linker, wait_for_change):
-    print("**start watch transpile")
-
-    from .parcel import make as parcel_make
-
-    while True:
-        copy_resources(linker)
-        sources = linker.context["python_sources"] | linker.context["resources"]
-        wait_for_change(sources)
-        print("**sources changed")
-        transpile(linker)
-
-        parcel_make(linker)
-
-
-def start_watcher(linker, wait_for_change):
-    return [spawn(watch, linker, wait_for_change)]

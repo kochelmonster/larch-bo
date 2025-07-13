@@ -9,6 +9,7 @@ from larch.bo.client.session import Session
 from larch.bo.client.control import register
 
 
+
 # __pragma__("skip")
 class Console:
     def log(self, *args):
@@ -110,7 +111,7 @@ class ChunkedEmployeeLoader(provider.DelayedChunkProvider):
 @register(EmployeeLoader)
 class Employees(state.MixinState, cursor.MixinCursor, MixinCommandHandler, Table):
     layout = """
-    Emplyoees{c}
+    Employees{c}
 Id       |Name      | Office     |Age          |Start      |Salary           |Address
 ---
 [.js.id_]|[.js.name]|[.js.office]|[.js.age]{r} |[.js.start]|[.js.salary]{r}  |[.js.address]
@@ -163,7 +164,7 @@ Id       |Name      | Office     |Age          |Start      |Salary           |Ad
 class ChunkedEmployees(state.MixinState, selection.MixinToggleSelector,
                        selection.MixinSelection, MixinCommandHandler, Table):
     layout = """
-    Emplyoees{c}
+    Employees{c}
 *    |Id       |Name      | Office     |Age         |Start      |Salary         |Address
 ---
 *{rt}|[.js.id_]|[.js.name]|[.js.office]|[.js.age]{r}|[.js.start]|[.js.salary]{r}|[.js.address]

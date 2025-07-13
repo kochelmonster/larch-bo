@@ -40,7 +40,7 @@ class Hello(Grid):
 [.msg]{c}@text
 [.name_]
 [.greeting]
-(0, 1em)         |<1>
+(0, 1ex)         |<1>
 [.buttons]{r}
 <1>
 """

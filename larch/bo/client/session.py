@@ -187,7 +187,7 @@ loading_modules.push(window.lbo.state.synch_from_hash().promise)
 
 class Session:
     """
-    A singlton that handles global management tasks for controls, like
+    A singleton that handles global management tasks for controls, like
       - keeping track of taborder
       - collecting all active commands and keystrokes
 
