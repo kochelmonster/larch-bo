@@ -16,7 +16,7 @@ dependencies = [
     "larch-reactive",
     "werkzeug >= 2.3.0",
     "msgpack >= 0.6.0",
-    "gevent-websocket >= 0.10.1",
+    "gevent-websocket @ git+https://gitlab.com/noppo/gevent-websocket.git@master",
     "watchdog-gevent",
     "transcrypt @ git+https://github.com/kochelmonster/Transcrypt.git@master",
 ]
