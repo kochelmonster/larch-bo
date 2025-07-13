@@ -57,6 +57,8 @@ class Animator:
         ".disappearing": ["opacity"]
     }
 
+    EASE = "cubicBezier(.42,0,.58,1)"
+
     def __init__(self):
         self.animated_elements = self.styles_changed = None
         info = get_info()
@@ -199,12 +201,13 @@ class Animator:
             if "auto" not in after and after != props["before"]:
                 props["after"] = after
                 props["restore"] = element.style[style_id]
-                animation_size = max(calc_animation_size(before, after), animation_size)
+                animation_size = max(calc_animation_size(
+                    before, after), animation_size)
                 animated.append(props)
 
         if len(animated):
             # calc animation duration
-            if showing_objects == "show":
+            if showing_objects:
                 duration = self.time_show
             elif hidding_objects:
                 duration = self.time_hide
@@ -219,21 +222,22 @@ class Animator:
 
             # define animation
             # __pragma__("jsiter")
-            timeline = anime["default"].timeline({
-                "easing": "cubicBezier(.42,0,.58,1)",
-                "duration": duration
-            })
+            timeline = anime.createTimeline(
+                {"defaults": {"ease": self.EASE,
+                              "duration": duration}})
             # __pragma__("nojsiter")
-
             for props in animated:
+                # path error in transctypt!
                 # __pragma__("jsiter")
-                timeline.add({
-                    "targets": props["element"],
-                    props["style"]: [props["before"], props["after"]]
-                }, 0)
+                args = {}
+                args[props["style"]] = [props["before"], props["after"]]
                 # __pragma__("nojsiter")
+                timeline.add(props["element"], args, 0)
 
-            timeline.finished.then(self._transition_end)
+                # set start styles
+                props["element"].style[props["style"]] = props["before"]
+
+            timeline.then(self._transition_end)
         else:
             self.animated_elements = self.styles_changed = None
 
