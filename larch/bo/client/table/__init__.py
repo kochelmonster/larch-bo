@@ -1,7 +1,7 @@
 """
-A vitrual tree table based on  css grid
+A virtual tree table based on  css grid
 
-The veritcal Layout of the grid:
+The vertical Layout of the grid:
 +---------------------------------------+
 | header (sticky, optional)             |
 +---------------------------------------+
@@ -339,7 +339,7 @@ class Table(Control):
         start = max(self.anchor.row - 4, 0)
         end = min(start+self.max_block_size, self.row_count)
         start = min(start, end - 4)  # self.ancho
-        data = self.provider.request(start, end)
+        data = self.provider.request_data(start, end)
         display_height = i = 0
 
         def render_row(i):
