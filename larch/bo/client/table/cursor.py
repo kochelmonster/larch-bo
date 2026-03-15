@@ -68,11 +68,11 @@ class MixinCursor:
 
     def get_pageup_position(self):
         height = self.element.clientHeight - self.header.height - self.footer.height
-        return max(int(self.cursor - height/self.current_row_height), 0)
+        return max(int(self.cursor - height/self.row_height), 0)
 
     def get_pagedown_position(self):
         height = self.element.clientHeight - self.header.height - self.footer.height
-        return min(int(self.cursor + height/self.current_row_height), self.row_count - 1)
+        return min(int(self.cursor + height/self.row_height), self.row_count - 1)
 
     def set_cursor(self, cursor, bottom=False):
         cursor = min(max(cursor, 0), self.row_count-1)
@@ -108,34 +108,78 @@ class MixinCursor:
         return [self.element]
 
     def scroll_to_cursor(self, bottom=False):
-        start = self.rows[0].lbo_row
-        row = self.rows[self.cursor-start]
-        if row:
-            # scrollIntoView does not work with sticky headers/footers
-            rect = self.element.getBoundingClientRect()
-            min_top = rect.top + self.header.height
-            max_bottom = rect.bottom - self.footer.height
-
-            rect = row.getBoundingClientRect()
-            if rect.bottom > max_bottom:
-                self.element.scrollBy(0, rect.bottom-max_bottom+1)
-                rect = row.getBoundingClientRect()
-
-            if rect.top < min_top:
-                self.element.scrollBy(0, rect.top-min_top)
-
-            self.update_anchor()
-            self.updated += 1
+        if self.is_virtual():
+            self._scroll_to_cursor_virtual(bottom)
         else:
-            # outside the display block
-            self.anchor.row = self.cursor
+            self._scroll_to_cursor_static(bottom)
+
+    def _scroll_to_cursor_virtual(self, bottom=False):
+        if not len(self.rows):
+            # no rows rendered yet
             if bottom:
-                self.anchor.offset = max_bottom-min_top-1
-                self.update_display()
-                self.scroll_to_cursor()
+                target = max(self.cursor - self.visible_count + 1, 0)
             else:
-                self.anchor.offset = 0
-                self.update_display()
+                target = self.cursor
+            self._scroll_far(target)
+            return
+
+        start = self.rows[0].lbo_row
+        end = self.rows[len(self.rows) - 1].lbo_row
+
+        if self.cursor < start or self.cursor > end:
+            # cursor outside rendered range
+            if bottom:
+                target = max(self.cursor - self.visible_count + 1, 0)
+            else:
+                target = self.cursor
+            self._scroll_far(target)
+            return
+
+        # cursor is in rendered range — check if visible
+        cursor_index = self.cursor - start
+        row = self.rows[cursor_index]
+        rect = self.element.getBoundingClientRect()
+        min_top = rect.top + self.header.height
+        max_bottom = rect.bottom - self.footer.height
+        row_rect = row.getBoundingClientRect()
+
+        if row_rect.bottom > max_bottom:
+            # cursor below visible area
+            target = max(self.cursor - self.visible_count + 1, 0)
+            self._scroll_near(target)
+        elif row_rect.top < min_top:
+            # cursor above visible area
+            self._scroll_near(self.cursor)
+        else:
+            # already visible, just update
+            self._sync_scrollbar()
+            self.updated += 1
+
+    def _scroll_to_cursor_static(self, bottom=False):
+        if not len(self.rows):
+            return
+
+        start = self.rows[0].lbo_row
+        cursor_index = self.cursor - start
+
+        if cursor_index < 0 or cursor_index >= len(self.rows):
+            return
+
+        row = self.rows[cursor_index]
+
+        rect = self.element.getBoundingClientRect()
+        min_top = rect.top + self.header.height
+        max_bottom = rect.bottom - self.footer.height
+
+        row_rect = row.getBoundingClientRect()
+        if row_rect.bottom > max_bottom:
+            self.element.scrollBy(0, row_rect.bottom - max_bottom + 1)
+            row_rect = row.getBoundingClientRect()
+
+        if row_rect.top < min_top:
+            self.element.scrollBy(0, row_rect.top - min_top)
+
+        self.updated += 1
 
     def get_state(self):
         state = super().get_state()

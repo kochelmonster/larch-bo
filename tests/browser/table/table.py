@@ -51,6 +51,10 @@ if __name__ == "__main__":
         "debug": True,
         "transmitter": "socket",
         "api": API()}
+
+    if "--type=test" in sys.argv:
+        from test_table import *  # noqa: F401,F403 — make tests discoverable
+
     sys.exit(run(__file__, config=config))
 # ---------------------------------------------------
 # __pragma__ ("noskip")

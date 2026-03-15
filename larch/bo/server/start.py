@@ -197,23 +197,60 @@ def run_server(application, config):
 
 def run_tests(application, config):
     import unittest
-    from .test import SeleniumBase, driver
-    SeleniumBase.application = application
-    SeleniumBase.config = config
+    import gevent
+    from .test import PlaywrightBase, driver
+
+    # Undo gevent's subprocess monkey-patch.  Playwright spawns a browser
+    # process via asyncio.create_subprocess_exec → subprocess.Popen.
+    # gevent's patched Popen requires the default loop's child watcher,
+    # which isn't available in a threadpool thread.  The gevent WSGI
+    # server doesn't need subprocess, so restoring the original is safe.
+    import subprocess
+    from gevent.monkey import saved
+    if 'subprocess' in saved:
+        for name, original in saved['subprocess'].items():
+            setattr(subprocess, name, original)
+
+    config['debug'] = True
+    config['test'] = True
+    config.setdefault("address", ("127.0.0.1", 0))
+    config.setdefault('localrun', '')
+
+    server = start_wsgi(application, config)
+    # update address to reflect OS-assigned port
+    config["address"] = server.address
+
+    PlaywrightBase.application = application
+    PlaywrightBase.config = config
+    PlaywrightBase.server = server
     argv = sys.argv[:]
     argv.remove("--type=test")
     try:
         argv.remove("--recompile")
     except ValueError:
         pass
-    config['debug'] = True
-    config['test'] = True
-    try:
-        result = unittest.main(argv=argv, failfast=True, exit=False).result.wasSuccessful()
-    finally:
-        logger.debug("##shutdown driver", stack_info=True)
-        driver.shutdown()
-    return 0 if result else -1
+
+    # Run tests in a native OS thread so that the gevent hub stays free
+    # to serve HTTP requests from the browser.  Playwright's sync API
+    # blocks the calling thread; if that thread is the main greenlet,
+    # gevent can never handle the incoming connections → deadlock.
+    result_holder = [False]
+
+    def _run_tests():
+        try:
+            result_holder[0] = unittest.main(
+                argv=argv, failfast=True, exit=False
+            ).result.wasSuccessful()
+        finally:
+            logger.debug("##shutdown driver", stack_info=True)
+            driver.shutdown()
+
+    pool = gevent.get_hub().threadpool
+    pool.spawn(_run_tests).get()   # blocks greenlet, not the hub
+
+    server.stop()
+    config["application"].shutdown()
+    return 0 if result_holder[0] else -1
 
 
 def start_wsgi(application, config):

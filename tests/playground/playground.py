@@ -32,7 +32,10 @@ class Test:
 
 
 class TestChild(Test):
-    pass
+    def count_100(self, index):
+        for j in range(100):
+            index = index + 1
+        return index
 
 
 class TestChild2(Test):
@@ -41,6 +44,8 @@ class TestChild2(Test):
 
 t1 = TestChild()
 console.log("t1.1", t1.data, [1, 2, 3])
+result = t1.count_100(0)
+console.log("count 100", result)
 
 t1.__class__.data = [4, 5, 6]
 console.log("t1.2", t1.data, [4, 5, 6])

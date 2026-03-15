@@ -7,9 +7,9 @@
 
 .lbo-table {
   max-height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   position: relative;
+  flex: 1;
 
   &:focus-within {
     outline-style: none;
@@ -101,4 +101,14 @@
   }
 
   border-radius: var(--lbo-border-radius-l);
+}
+
+.lbo-scrollbar-area {
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin-left: -1px;
+
+  div {
+    width: 1px;
+  }
 }

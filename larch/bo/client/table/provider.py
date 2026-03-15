@@ -70,7 +70,6 @@ class DelayedDataProvider(TableDataProvider):
                 self.set_data(data)
                 self.table.set_state(state)
                 self.table.set_row_count(len(data))
-                self.table.update_data()
 
             self.table.set_row_count(self.PLACEHOLDER_COUNT)
             if not self.promise:
@@ -165,10 +164,9 @@ class DelayedChunkProvider(TableDataProvider):
             self.table.set_row_count(chunk.count)
         range_ = self.table.get_display_range()
         if range_[0] < chunk.start + chunk.chunk_size and chunk.start < range_[1]:
-            self.table.update_data()
+            self.table.refresh_visible_data()
 
     def request_data(self, start, end):
-        return [self.PLACEHOLDER for i in range(start, end)]
         container = self.make_chunk_container()
         result = []
         chunk_size = container.chunk_size
@@ -182,5 +180,4 @@ class DelayedChunkProvider(TableDataProvider):
             else:
                 self.request_chunk(i)
                 return [self.PLACEHOLDER for i in range(start, end)]
-        # what happens if only part of the result is available?
         return result[:end-start]
