@@ -14,7 +14,7 @@ class TestStaticMode(PlaywrightBase):
 
     def _set_count(self, count):
         """Set the Controller count field."""
-        inp = self.page.locator("vaadin-integer-field").first
+        inp = self.page.locator("vaadin-number-field input").first
         inp.click()
         inp.press("Control+a")
         inp.fill(str(count))
@@ -39,6 +39,7 @@ class TestStaticMode(PlaywrightBase):
         scroll_top_before = self.page.evaluate(
             "() => document.querySelector('.lbo-table').scrollTop")
         box = self.page.locator(".lbo-table").bounding_box()
+        assert box is not None
         self.page.mouse.move(box["x"] + box["width"] / 2,
                              box["y"] + box["height"] / 2)
         self.page.mouse.wheel(0, 200)
@@ -100,11 +101,11 @@ class TestFarScroll(PlaywrightBase):
 
     def test_jump_to_end(self):
         row_count = self.table_eval("row_count")
-        self.scroll_to_fraction(0.99)
+        self.scroll_to_fraction(1.0)
         first_row = self.table_eval("first_row")
         visible = self.table_eval("visible_count")
-        # first_row should be near the end
-        self.assertGreater(first_row, row_count - visible * 3)
+        # first_row should be exactly row_count - visible_count
+        self.assertEqual(first_row, row_count - visible)
 
     def test_jump_back_to_top(self):
         self.scroll_to_fraction(0.8)
@@ -122,7 +123,7 @@ class TestChunkedMode(PlaywrightBase):
     """Chunked data loading via toggle switch."""
 
     def _toggle_chunked(self):
-        switch = self.page.locator("vaadin-switch").last
+        switch = self.page.locator("jelly-switch").last
         switch.click()
         # wait for table to re-render
         self.page.wait_for_timeout(2000)
@@ -160,11 +161,12 @@ class TestCursorNavigation(PlaywrightBase):
 
     def test_arrow_down(self):
         self._focus_table()
+        cursor_start = self.table_eval("cursor")
         for _ in range(5):
             self.page.keyboard.press("ArrowDown")
         self.page.wait_for_timeout(100)
         cursor = self.table_eval("cursor")
-        self.assertEqual(cursor, 5)
+        self.assertEqual(cursor, cursor_start + 5)
 
     def test_page_down(self):
         self._focus_table()
@@ -200,12 +202,15 @@ class TestStatePersistence(PlaywrightBase):
     def test_anchor_restored(self):
         # Scroll to approximately 50%
         self.scroll_to_fraction(0.5)
+        # Wait for debounced state save (50ms debounce in state + 50ms in synch_to_hash)
+        self.page.wait_for_timeout(500)
         anchor = self.table_eval("anchor.row")
         self.assertGreater(anchor, 0)
 
-        # Reload page
-        self.page.reload()
+        # Reload page (preserving the hash)
+        self.page.reload(wait_until="networkidle")
         self.page.locator(".lbo-table section").first.wait_for(timeout=15000)
+        self.page.wait_for_timeout(500)
 
         # Anchor should be approximately restored
         restored = self.table_eval("anchor.row")

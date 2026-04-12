@@ -200,17 +200,6 @@ def run_tests(application, config):
     import gevent
     from .test import PlaywrightBase, driver
 
-    # Undo gevent's subprocess monkey-patch.  Playwright spawns a browser
-    # process via asyncio.create_subprocess_exec → subprocess.Popen.
-    # gevent's patched Popen requires the default loop's child watcher,
-    # which isn't available in a threadpool thread.  The gevent WSGI
-    # server doesn't need subprocess, so restoring the original is safe.
-    import subprocess
-    from gevent.monkey import saved
-    if 'subprocess' in saved:
-        for name, original in saved['subprocess'].items():
-            setattr(subprocess, name, original)
-
     config['debug'] = True
     config['test'] = True
     config.setdefault("address", ("127.0.0.1", 0))

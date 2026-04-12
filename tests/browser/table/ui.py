@@ -46,7 +46,7 @@ Toggle Loader|[.chunked]@switch
     chunked = Cell(False)
 
     @rule
-    def _rule_change_count(self):
+    def _rule_change_count_enabled(self):
         if self.element:
             self.contexts["count"].set("disabled", self.chunked)
 
@@ -216,9 +216,11 @@ class Frame(Grid):
         yield
         if chunked:
             self.employees = ChunkedEmployeeLoader()
+            console.log("***toggle to chunked")
         else:
             self.employees = EmployeeLoader()
             self.employees.set_count(self.controller.count)
+            console.log("***toggle to normal")
 
 
 def main():

@@ -26,6 +26,13 @@
     }
   }
 
+  .b.placeholder span {
+    color: transparent;
+    background: var(--lbo-contrast-20pct);
+    border-radius: 4px;
+    display: inline-block;
+  }
+
   &.hide-selector {
     .selector {
       display: none

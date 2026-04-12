@@ -1,12 +1,51 @@
 """Playwright-based test harness for larch.bo browser tests."""
+from __future__ import annotations
 import os
+import sys
 import unittest
 import logging
-from playwright.sync_api import sync_playwright
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from playwright.sync_api import Browser, Page
 
 logger = logging.getLogger('larch.bo.server.test')
 
 HEADLESS = os.environ.get("HEADLESS", "true").lower() != "false"
+
+
+def _restore_subprocess():
+    """Undo gevent's subprocess monkey-patch.
+
+    Playwright spawns a Node.js process via asyncio → subprocess.Popen.
+    gevent's patched Popen requires the default libev loop's child watcher,
+    which fails in threadpool threads.  We restore the original stdlib
+    subprocess module so Playwright (and asyncio) work normally.
+    """
+    try:
+        from gevent.monkey import saved  # type: ignore[attr-defined]
+    except ImportError:
+        return
+
+    originals = saved.get('subprocess')
+    if not originals:
+        return
+
+    import subprocess
+    for name, original in originals.items():
+        setattr(subprocess, name, original)
+
+    # Also replace the module in sys.modules so that fresh imports
+    # (including asyncio internals) get the un-patched version.
+    import importlib
+    stdlib_subprocess = importlib.import_module('subprocess')
+    # The module object is the same; we just patched its attributes above.
+    # Force asyncio to pick up the changes by clearing its cached reference.
+    if 'asyncio' in sys.modules and hasattr(sys.modules['asyncio'], 'subprocess'):
+        import asyncio.subprocess as _asub
+        # asyncio.subprocess imports subprocess at module level;
+        # replace the cached reference.
+        _asub.subprocess = stdlib_subprocess  # type: ignore[attr-defined]
 
 
 class _Driver:
@@ -17,14 +56,16 @@ class _Driver:
         self._browser = None
 
     def start(self):
+        _restore_subprocess()
+        from playwright.sync_api import sync_playwright
         self._pw = sync_playwright().start()
         self._browser = self._pw.chromium.launch(headless=HEADLESS)
 
     @property
-    def browser(self):
+    def browser(self) -> Browser:
         if self._browser is None:
             self.start()
-        return self._browser
+        return self._browser  # type: ignore[return-value]
 
     def shutdown(self):
         if self._browser:
@@ -46,8 +87,10 @@ class PlaywrightBase(unittest.TestCase):
     """
 
     application = None
-    config = None
+    config: dict = {}  # set by run_tests() before suite runs
     server = None
+    browser: Browser
+    page: Page
 
     @classmethod
     def setUpClass(cls):
@@ -60,13 +103,14 @@ class PlaywrightBase(unittest.TestCase):
 
     def setUp(self):
         self.page = self.browser.new_page()
-        self.page.goto(self.base_url)
+        self.page.on("pageerror", lambda err: print(f"PAGE ERROR: {err}", flush=True))
+        self.page.goto(self.base_url, wait_until="networkidle")
         self.page.locator(".lbo-table section").first.wait_for(timeout=30000)
 
     def tearDown(self):
         if self.page:
             self.page.close()
-            self.page = None
+            self.page = None  # type: ignore[assignment]
 
     # -- helpers -----------------------------------------------------------
 
@@ -99,6 +143,7 @@ class PlaywrightBase(unittest.TestCase):
         """Send a mouse wheel event to the table and wait for render."""
         prev = self.table_eval("first_row")
         box = self.page.locator(".lbo-table").bounding_box()
+        assert box is not None
         self.page.mouse.move(box["x"] + box["width"] / 2,
                              box["y"] + box["height"] / 2)
         self.page.mouse.wheel(0, delta_y)
@@ -110,7 +155,8 @@ class PlaywrightBase(unittest.TestCase):
         self.page.evaluate(
             f"""() => {{
                 let sb = document.querySelector('.lbo-scrollbar-area');
-                sb.scrollTop = sb.scrollHeight * {fraction};
+                let maxScroll = sb.scrollHeight - sb.clientHeight;
+                sb.scrollTop = maxScroll * {fraction};
             }}""")
         self.wait_for_render(prev)
 

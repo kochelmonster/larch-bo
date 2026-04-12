@@ -119,13 +119,23 @@ class VirtualHandler:
     def _scrolltop_to_anchor(self, scroll_top):
         if not self.virtual_scroll_space:
             return 0
-        row = int((scroll_top / self.virtual_scroll_space) * self.row_count)
-        return max(0, min(row, self.row_count - 1))
+        max_scroll = self.scrollbar_container.scrollHeight - self.scrollbar_container.clientHeight
+        if max_scroll <= 0:
+            return 0
+        max_anchor = self.row_count - self.visible_count
+        if max_anchor <= 0:
+            return 0
+        row = int((scroll_top / max_scroll) * max_anchor)
+        return max(0, min(row, max_anchor))
 
     def _sync_scrollbar(self):
         if not self.row_count:
             return
-        expected = (self.first_row / self.row_count) * self.virtual_scroll_space
+        max_scroll = self.scrollbar_container.scrollHeight - self.scrollbar_container.clientHeight
+        max_anchor = self.row_count - self.visible_count
+        if max_scroll <= 0 or max_anchor <= 0:
+            return
+        expected = (self.first_row / max_anchor) * max_scroll
         if abs(expected - self.scrollbar_container.scrollTop) > 1:
             self._expected_scroll_top = expected
             self.scrollbar_container.scrollTop = expected
@@ -200,6 +210,7 @@ class VirtualHandler:
         self._trim_pool()
         self._update_avg_height()
         self._sync_scrollbar()
+        self.update_columns()
         self.updated += 1
 
     # --- Far scroll (full rebuild) ---
@@ -240,6 +251,7 @@ class VirtualHandler:
         self._update_avg_height()
         self._set_virtual_scroll_space()
         self._sync_scrollbar()
+        self.update_columns()
         self.updated += 1
 
     def fill_static_body(self):
@@ -277,29 +289,29 @@ class VirtualHandler:
     # --- Height tracking ---
 
     def _update_avg_height(self):
+        count = 0
+        total = 0
         # __pragma__("jsiter")
-        keys = self.row_heights.keys()
+        for k in self.row_heights:
+            total += self.row_heights[k]
+            count += 1
         # __pragma__("nojsiter")
-        count = len(keys)
         if count > 0:
-            total = 0
-            for k in keys:
-                total += self.row_heights[k]
             self.row_height = total / count
 
     def _set_virtual_scroll_space(self):
         if not self.row_count:
             return
 
+        measured_count = 0
+        measured_total = 0
         # __pragma__("jsiter")
-        keys = self.row_heights.keys()
+        for k in self.row_heights:
+            measured_total += self.row_heights[k]
+            measured_count += 1
         # __pragma__("nojsiter")
-        measured_count = len(keys)
 
         if measured_count > 0:
-            measured_total = 0
-            for k in keys:
-                measured_total += self.row_heights[k]
             unmeasured = self.row_count - measured_count
             total = measured_total + unmeasured * self.row_height
         else:
@@ -735,6 +747,17 @@ class Table(VirtualHandler, LayoutHandler, Control):
         self.render_context.value = data
         self.body.render_content(row_element, data_row)
 
+        is_placeholder = bool(data and data.__placeholder__)
+        el = row_element
+        while el:
+            if is_placeholder:
+                el.classList.add("placeholder")
+            else:
+                el.classList.remove("placeholder")
+            el = el.nextElementSibling
+            if el and el.lbo_row != data_row:
+                break
+
         height = row_element.getBoundingClientRect().height
         self.row_heights[data_row] = height
         return height
@@ -759,6 +782,15 @@ class Table(VirtualHandler, LayoutHandler, Control):
                 self.row_heights[data_row] = (
                     row_el.getBoundingClientRect().height)
 
+                # remove placeholder styling (real data arrived)
+                el = row_el
+                while el:
+                    el.classList.remove("placeholder")
+                    el = el.nextElementSibling
+                    if el and el.lbo_row != data_row:
+                        break
+
+        self.update_columns()
         self.updated += 1
 
     def update_anchor(self):

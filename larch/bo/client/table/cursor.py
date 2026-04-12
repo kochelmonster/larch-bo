@@ -132,7 +132,12 @@ class MixinCursor:
                 target = max(self.cursor - self.visible_count + 1, 0)
             else:
                 target = self.cursor
-            self._scroll_far(target)
+
+            # use near scroll when the target is close to the current view
+            if abs(target - self.first_row) <= len(self.rows) // 2:
+                self._scroll_near(target)
+            else:
+                self._scroll_far(target)
             return
 
         # cursor is in rendered range — check if visible
