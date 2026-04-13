@@ -56,7 +56,7 @@ class EmployeeLoader(provider.DelayedDataProvider, Reactive):
     # __pragma__("jsiter")
     PLACEHOLDER = {
         '__placeholder__': True,
-        'id_': 10000,
+        'id_': 8888888,
         'name': 'Jennifer Davis',
         'office': 'Chaneystad',
         'age': 162, 'salary': 7295.72,

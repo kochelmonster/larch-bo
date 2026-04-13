@@ -2,7 +2,7 @@ from larch.reactive import Cell, rule
 from ..command import command
 
 # __pragma__("skip")
-window = None
+window = console = None
 # __pragma__ ("noskip")
 
 
@@ -32,7 +32,9 @@ class MixinCursor:
 
     @command(key="end")
     def cursor_end(self):
+        console.log(f"[cursor] cursor_end: row_count={self.row_count}")
         self.set_cursor(self.row_count-1)
+        self.scroll_to_cursor(True)
 
     @command(key="pageup")
     def cursor_pageup(self):
@@ -44,7 +46,8 @@ class MixinCursor:
     def cursor_pagedown(self):
         cursor = self.get_pagedown_position()
         if cursor is not None:
-            self.set_cursor(cursor, True)
+            self.set_cursor(cursor)
+            self.scroll_to_cursor(True)
 
     @command(key="pointerdown-0")
     def cursor_mouse(self):
@@ -115,12 +118,15 @@ class MixinCursor:
 
     def _scroll_to_cursor_virtual(self, bottom=False):
         if not len(self.rows):
-            # no rows rendered yet
-            if bottom:
-                target = max(self.cursor - self.visible_count + 1, 0)
+            # no rows rendered yet — bottom-align if going down
+            console.log(f"[cursor] scroll_virtual: no rows, cursor={self.cursor} bottom={bottom}")
+            if bottom or self.cursor > 0:
+                self.anchor.row = self.cursor
+                self.anchor.bottom = 0
             else:
-                target = self.cursor
-            self._scroll_far(target)
+                self.anchor.row = self.cursor
+                self.anchor.bottom = None
+            self.fill_body()
             return
 
         start = self.rows[0].lbo_row
@@ -128,16 +134,18 @@ class MixinCursor:
 
         if self.cursor < start or self.cursor > end:
             # cursor outside rendered range
-            if bottom:
-                target = max(self.cursor - self.visible_count + 1, 0)
+            console.log(f"[cursor] scroll_virtual: cursor={self.cursor} OUTSIDE rows {start}..{end} bottom={bottom}")
+            if self.cursor > end:
+                self.anchor.row = self.cursor
+                self.anchor.bottom = 0
+                self.fill_body()
             else:
-                target = self.cursor
-
-            # use near scroll when the target is close to the current view
-            if abs(target - self.first_row) <= len(self.rows) // 2:
-                self._scroll_near(target)
-            else:
-                self._scroll_far(target)
+                self.anchor.bottom = None
+                if abs(self.cursor - self.first_row) <= len(self.rows) // 2:
+                    self._scroll_near(self.cursor)
+                else:
+                    self.anchor.row = self.cursor
+                    self.fill_body()
             return
 
         # cursor is in rendered range — check if visible
@@ -149,14 +157,26 @@ class MixinCursor:
         row_rect = row.getBoundingClientRect()
 
         if row_rect.bottom > max_bottom:
-            # cursor below visible area
-            target = max(self.cursor - self.visible_count + 1, 0)
-            self._scroll_near(target)
+            # cursor below visible area — bottom-align
+            console.log(f"[cursor] scroll_virtual: cursor={self.cursor} below visible, bottom-align")
+            self.anchor.row = self.cursor
+            self.anchor.bottom = 0
+            self._apply_bottom_alignment()
+            self._sync_scrollbar()
+            self.updated += 1
         elif row_rect.top < min_top:
             # cursor above visible area
+            console.log(f"[cursor] scroll_virtual: cursor={self.cursor} above visible, near-scroll")
+            self.anchor.bottom = None
             self._scroll_near(self.cursor)
         else:
-            # already visible, just update
+            # already visible
+            if bottom:
+                console.log(f"[cursor] scroll_virtual: cursor={self.cursor} visible, force bottom-align")
+                self.anchor.row = self.cursor
+                self.anchor.bottom = 0
+                self.fill_virtual_body()
+                return
             self._sync_scrollbar()
             self.updated += 1
 
@@ -204,14 +224,19 @@ class MixinCursor:
         if self.updated:
             cursor = self.cursor
             yield
-            for el in self.element.querySelectorAll(".cursor"):
-                el.classList.remove("cursor")
-
             if not self.rows.length:
                 return
 
-            self.old_cursor = cursor
             start = self.rows[0].lbo_row
+            end = self.rows[self.rows.length - 1].lbo_row
+            if cursor < start or cursor > end:
+                # cursor not yet in rendered range — keep old highlight
+                return
+
+            for el in self.element.querySelectorAll(".cursor"):
+                el.classList.remove("cursor")
+
+            self.old_cursor = cursor
             row = self.rows[cursor-start]
             if row:
                 for c in self.body.contexts:

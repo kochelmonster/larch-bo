@@ -9,6 +9,24 @@ import unittest
 from larch.bo.server.test import PlaywrightBase
 
 
+FOOTER_INFO_JS = """() => {
+    const table = document.querySelector('.lbo-table');
+    const t = table.table;
+    const rect = table.getBoundingClientRect();
+    const footers = table.querySelectorAll('footer');
+    const lastFooter = footers[footers.length - 1];
+    const fRect = lastFooter ? lastFooter.getBoundingClientRect() : null;
+    return {
+        table_bottom: rect.bottom,
+        footer_bottom: fRect ? fRect.bottom : -1,
+        footer_gap: fRect ? rect.bottom - fRect.bottom : -1,
+        scrollTop: table.scrollTop,
+        scrollHeight: table.scrollHeight,
+        clientHeight: table.clientHeight,
+    };
+}"""
+
+
 class TestStaticMode(PlaywrightBase):
     """Static mode (row_count ≤ STATIC_LIMIT=200): all rows rendered, native scroll."""
 
@@ -47,6 +65,17 @@ class TestStaticMode(PlaywrightBase):
         scroll_top_after = self.page.evaluate(
             "() => document.querySelector('.lbo-table').scrollTop")
         self.assertGreater(scroll_top_after, scroll_top_before)
+
+    def test_end_footer_aligned(self):
+        """Footer aligned at viewport bottom after pressing End."""
+        self._set_count(200)
+        self.page.locator(".lbo-table").click()
+        self.page.wait_for_timeout(100)
+        self.page.keyboard.press("End")
+        self.page.wait_for_timeout(500)
+        result = self.page.evaluate(FOOTER_INFO_JS)
+        self.assertLessEqual(abs(result["footer_gap"]), 2,
+            f"Footer bottom off by {result['footer_gap']}px")
 
 
 class TestVirtualMode(PlaywrightBase):
@@ -151,6 +180,116 @@ class TestChunkedMode(PlaywrightBase):
         first_after = self.table_eval("first_row")
         self.assertGreater(first_after, first_before)
 
+    def test_toggle_back_footer_aligned(self):
+        """Reproduce: toggle chunked, End, toggle back, End — footer must stay aligned."""
+        # 1) toggle to chunked
+        self._toggle_chunked()
+        self.page.locator(".lbo-table").click()
+        self.page.wait_for_timeout(200)
+
+        # 2) press End in chunked mode
+        self.page.keyboard.press("End")
+        self.page.wait_for_timeout(1000)
+
+        # 3) toggle back to normal 500
+        self._toggle_chunked()  # toggle off
+        self.page.wait_for_timeout(500)
+
+        # Check footer immediately after toggle back (before pressing End)
+        result_before = self.page.evaluate(FOOTER_INFO_JS)
+
+        self.page.locator(".lbo-table").click()
+        self.page.wait_for_timeout(200)
+
+        # 4) press End
+        self.page.keyboard.press("End")
+        self.page.wait_for_timeout(500)
+
+        result = self.page.evaluate(FOOTER_INFO_JS)
+
+        self.assertLessEqual(abs(result_before["footer_gap"]), 2,
+            f"Before End: footer off by {result_before['footer_gap']}px")
+        self.assertLessEqual(abs(result["footer_gap"]), 2,
+            f"After End: footer off by {result['footer_gap']}px")
+
+    def test_scrollbar_end_after_toggle_back(self):
+        """Scrollbar at max position should show last row after toggle back."""
+        self._toggle_chunked()
+        self.page.locator(".lbo-table").click()
+        self.page.wait_for_timeout(200)
+        self.page.keyboard.press("End")
+        self.page.wait_for_timeout(1000)
+        self._toggle_chunked()  # toggle back
+        self.page.wait_for_timeout(500)
+
+        # scroll up a bit, then scroll to very bottom
+        self.page.evaluate("""() => {
+            let sb = document.querySelector('.lbo-scrollbar-area');
+            sb.scrollTop = sb.scrollTop - 100;
+        }""")
+        self.page.wait_for_timeout(300)
+        self.page.evaluate("""() => {
+            let sb = document.querySelector('.lbo-scrollbar-area');
+            sb.scrollTop = sb.scrollHeight - sb.clientHeight;
+        }""")
+        self.page.wait_for_timeout(300)
+
+        row_count = self.table_eval("row_count")
+        visible = self.table_eval("visible_count")
+        first_row = self.table_eval("first_row")
+        last_row = self.page.evaluate(
+            "() => { let t = document.querySelector('.lbo-table').table; "
+            "return t.rows[t.rows.length-1].lbo_row; }")
+        self.assertEqual(first_row, row_count - visible,
+            f"first_row should be {row_count - visible}, got {first_row}")
+        self.assertEqual(last_row, row_count - 1,
+            f"last row should be {row_count - 1}, got {last_row}")
+
+    def test_columns_after_retoggle(self):
+        """Columns must not shrink after toggle→home→toggle back→toggle→end."""
+        # 1) toggle to chunked, press End, press Home
+        self._toggle_chunked()
+        self.page.locator(".lbo-table").click()
+        self.page.wait_for_timeout(200)
+        self.page.keyboard.press("End")
+        self.page.wait_for_timeout(1000)
+
+        # measure column widths in chunked mode at end
+        cols_first = self.page.evaluate("""() => {
+            let t = document.querySelector('.lbo-table').table;
+            return t.viewport.style.gridTemplateColumns;
+        }""")
+
+        self.page.keyboard.press("Home")
+        self.page.wait_for_timeout(500)
+
+        # 2) toggle to 500
+        self._toggle_chunked()  # back to normal
+
+        # 3) toggle to chunked again
+        self._toggle_chunked()
+        self.page.locator(".lbo-table").click()
+        self.page.wait_for_timeout(200)
+
+        # 4) press End
+        self.page.keyboard.press("End")
+        self.page.wait_for_timeout(1000)
+
+        cols_second = self.page.evaluate("""() => {
+            let t = document.querySelector('.lbo-table').table;
+            return t.viewport.style.gridTemplateColumns;
+        }""")
+
+        # parse pixel widths and compare
+        def parse_widths(s):
+            return [float(x.replace("px", "")) for x in s.split() if "px" in x]
+
+        w1 = parse_widths(cols_first)
+        w2 = parse_widths(cols_second)
+        for i in range(min(len(w1), len(w2))):
+            self.assertAlmostEqual(w1[i], w2[i], delta=20,
+                msg=f"Column {i} width changed too much: {w1[i]}→{w2[i]}")
+
 
 class TestCursorNavigation(PlaywrightBase):
     """Keyboard cursor navigation."""
@@ -184,6 +323,24 @@ class TestCursorNavigation(PlaywrightBase):
         cursor = self.table_eval("cursor")
         row_count = self.table_eval("row_count")
         self.assertEqual(cursor, row_count - 1)
+
+    def test_end_bottom_aligned(self):
+        self._focus_table()
+        self.page.keyboard.press("End")
+        self.page.wait_for_timeout(500)
+        # last row bottom should be at content area bottom (above footer)
+        result = self.page.evaluate("""() => {
+            const table = document.querySelector('.lbo-table');
+            const t = table.table;
+            const rect = table.getBoundingClientRect();
+            const sections = table.querySelectorAll('section.b');
+            const lastSection = sections[sections.length - 1];
+            const lastRect = lastSection.getBoundingClientRect();
+            const contentBottom = rect.bottom - t.footer.height;
+            return {diff: lastRect.bottom - contentBottom};
+        }""")
+        self.assertLessEqual(abs(result["diff"]), 2,
+            f"Last row bottom off by {result['diff']}px")
 
     def test_home(self):
         self._focus_table()

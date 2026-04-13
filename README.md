@@ -18,3 +18,8 @@ pip install -e .
 ## Development
 - Add shared dependencies to `requirements.txt`.
 - Add package metadata to `pyproject.toml`.
+
+## Problems
+- In Table: In chunk mode if pgup is pressed to fast the cursor some time disappears. It reapper when pressing down or up
+
+Is it possible to hover a tool tip at the scroll
