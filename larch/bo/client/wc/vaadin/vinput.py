@@ -61,7 +61,8 @@ class TextControl(MixinLiveTracker, MixinVaadin, MixinStyleObserver, Control):
     @rule
     def _rule_value_changed(self):
         if self.element:
-            self.element.setAttribute("value", self.python_to_html(self.context.value))
+            self.element.setAttribute(
+                "value", self.python_to_html(self.context.value))
 
 
 class EmailControl(TextControl):
@@ -101,7 +102,7 @@ def register(style=""):
     cregister(type(2), style)(IntControl)
     cregister(type(2.1), style)(FloatControl)
     if style:
-        style = "."+style
+        style = "." + style
     cregister(type(""), "multi"+style)(TextAreaControl)
     cregister(type(""), "password"+style)(PasswordControl)
     cregister(type(""), "email"+style)(EmailControl)
