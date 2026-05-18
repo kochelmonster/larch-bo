@@ -9,7 +9,7 @@ from .tools import MixinVaadin, MixinStyleObserver
 # __pragma__("skip")
 from larch.bo.packer import parcel
 parcel.NEEDED_PACKAGES.update([
-    "@vaadin/date-picker", "@vaadin/date-time-picker", "date-fns"])
+    "@vaadin/date-picker", "@vaadin/date-time-picker", "date-fns@2.30.0"])
 Date = console = document = loading_modules
 def __pragma__(*args): pass
 def __new__(*args): pass

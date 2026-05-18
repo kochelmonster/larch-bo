@@ -27,6 +27,10 @@ def needs_transpile(linker):
     return any(Path(source).stat().st_mtime > mtime for source, mtime in sources.items())
 
 
+def has_transcrypt_sourcemaps(linker):
+    return any(linker.trans_path.glob("*.map"))
+
+
 def additional_directories():
     dirs = set()
     try:
@@ -59,7 +63,7 @@ def transpile_transmitter(linker):
     transmitter_path = linker.path/"transmitter"
 
     print("transpile", transmitter)
-    cmd = f'python -m transcrypt --nomin --map --verbose -od {transmitter_path} {path}'
+    cmd = f'{sys.executable} -m transcrypt --nomin --map --verbose -od {transmitter_path} {path}'
     print(cmd)
     result = subprocess.run(
         cmd, shell=True, stderr=subprocess.STDOUT,
@@ -78,7 +82,7 @@ def transpile_transmitter(linker):
 def transpile(linker):
     logger.info("transpile python %r\n%r", linker.path, linker.config)
 
-    cmd = f'python -m transcrypt --nomin --map --verbose -od {linker.trans_path} {linker.config["root"]}'
+    cmd = f'{sys.executable} -m transcrypt --nomin --map --verbose -od {linker.trans_path} {linker.config["root"]}'
     dirs = list(linker.config.get("extra_search_path", [])) + additional_directories()
     if dirs:
         dirs = " ".join("-xp " + d.replace(" ", "#") for d in dirs)
@@ -128,6 +132,12 @@ def transpile(linker):
 
 def make(linker):
     if not needs_transpile(linker):
+        emit_source_maps = bool(
+            linker.config.get("debug") or linker.config.get("source_map"))
+        if emit_source_maps and not has_transcrypt_sourcemaps(linker):
+            transpile(linker)
+            copy_resources(linker)
+            return False
         return True
 
     transpile(linker)

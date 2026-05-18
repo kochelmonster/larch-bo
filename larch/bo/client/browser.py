@@ -58,7 +58,7 @@ def as_array(pyobj):
 
 
 class Executer:
-    MAX_EXECUTON_TIME = 10   # in ms
+    MAX_EXECUTION_TIME = 10   # in ms
 
     def __init__(self):
         self.tasks = deque()

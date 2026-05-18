@@ -12,6 +12,7 @@ def __pragma__(*args): pass
 
 
 def create_control_factory(context):
+    """Resolve a context's value to a Control via the adapter registry."""
     value = context.value
     if isinstance(value, Control):
         value.context = context
@@ -32,6 +33,7 @@ def create_control_factory(context):
 
 
 def register(type, style=""):
+    """Decorator that registers a control class for a given type and style."""
     def wrap(cls):
         adapter.register(type, Control, style or "", cls)
         return cls
@@ -47,15 +49,18 @@ class MixinEventHandler:
 
     # __pragma__("tconv")
     def fire_event(self, etype, element=None, detail=None, bubbles=False, cancelable=False):
+        """Dispatch a custom DOM event."""
         fire_event(etype, element, detail, bubbles, cancelable)
 
     def handle_event(self, name, listener, capture=False, element=None):
+        """Register a DOM event listener and track it for cleanup."""
         if element is None:
             element = document
         element.addEventListener(name, listener, capture)
         self.bound_events.append([name, element, listener])
 
     def unlink(self):
+        """Remove all tracked event listeners."""
         for name, element, listener in self.bound_events:
             element.removeEvent(name, listener)
         super().unlink()
@@ -63,7 +68,10 @@ class MixinEventHandler:
 
 
 class Control(Reactive):
+    """Base class for all UI controls."""
+
     def __init__(self, context_or_value=None):
+        """Accept a ControlContext or a raw value, which is auto-wrapped."""
         super().__init__()
         if not isinstance(context_or_value, ControlContext):
             context_or_value = ControlContext(context_or_value)
@@ -73,9 +81,11 @@ class Control(Reactive):
         return f"<{self.__class__.__name__}>"
 
     def unlink(self):
+        """Cleanup hook for subclasses to release resources."""
         pass
 
     def get_tab_elements(self):
+        """Return focusable elements for tab navigation."""
         return []
 
     def __ne__(self, other):
@@ -83,7 +93,10 @@ class Control(Reactive):
 
 
 class NullControl(Control):
+    """Fallback control rendered when no adapter match is found."""
+
     def render(self, parent):
+        """Render a red placeholder div into the parent element."""
         self.element = document.createElement("div")
         self.element.style.backgroundColor = "red"
         self.element.innerText = "NULL Control"
@@ -99,14 +112,17 @@ class HTMLControl(Control):
     element = Cell()
 
     def render(self, parent):
+        """Create a DOM element and append it to the parent."""
         self.element = document.createElement(self.TAG)
         parent.appendChild(self.element)
 
     def unlink(self):
+        """Clear the element reference."""
         self.element = None
 
     @rule
     def _rule_value_changed(self):
+        """Reactive rule that syncs innerHTML with the context value."""
         if self.element:
             self.element.innerHTML = self.context.value
 
@@ -118,11 +134,14 @@ class TextControl(HTMLControl):
     """
     @rule
     def _rule_value_changed(self):
+        """Reactive rule that syncs innerText with the context value."""
         if self.element:
             self.element.innerText = self.context.value
 
 
 class OptionManager(Reactive):
+    """Hierarchical option store with reactive observation support."""
+
     _observed_changed = Cell(0)
     _last_reactive_round = 0
 
@@ -136,6 +155,7 @@ class OptionManager(Reactive):
 
     # __pragma__ ('jscall')
     def observe(self, name):
+        """Reactively read an option, bubbling to the parent if not found."""
         if rcontext.inside_rule:
             # transform to container
             self._observed_changed   # touch
@@ -169,12 +189,14 @@ class OptionManager(Reactive):
         return [value] if value is not None else []
 
     def get(self, name):
+        """Non-reactive option lookup with parent fallback."""
         value = self.options.get(name)
         if value is None and self.parent is not None:
             return self.parent.get(name)
         return value
 
     def set(self, name, value):
+        """Set an option value and notify reactive observers."""
         self.options[name] = value
         if name in self.observed:
             with atomic(), untouched():
@@ -185,13 +207,15 @@ class OptionManager(Reactive):
 
 
 class ControlContext(OptionManager):
+    """Option context that holds a reactive value, supporting Pointer indirection."""
+
     _value = Cell()
 
     # __pragma__ ('kwargs')
     def __init__(self, value=None, parent=None, **kwargs):
         super().__init__()
-        self._value = value
         self.parent = parent
+        self._value = value
         self.options = kwargs
         self.options.setdefault("style", "")  # never bubble style
     # __pragma__ ('nokwargs')
@@ -199,6 +223,7 @@ class ControlContext(OptionManager):
     # __pragma__ ('jscall')
     @property
     def value(self):
+        """The resolved value, dereferencing through a Pointer if present."""
         v = self._value
         if isinstance(v, Pointer):
             return v.__call__()
@@ -206,6 +231,7 @@ class ControlContext(OptionManager):
 
     @value.setter
     def value(self, val):
+        """Write through the Pointer if present, otherwise set directly."""
         if isinstance(self._value, Pointer):
             self._value.__call__(val)
         else:
@@ -213,6 +239,7 @@ class ControlContext(OptionManager):
 
     @property
     def value_pointer(self):
+        """Return the underlying Pointer, or wrap the current value in one."""
         v = self._value
         if isinstance(v, Pointer):
             return v
@@ -221,6 +248,8 @@ class ControlContext(OptionManager):
 
 
 class RenderingContext(ControlContext):
+    """ControlContext with auto-rendering lifecycle managed by a reactive rule."""
+
     container = Cell()
 
     # __pragma__ ('kwargs')
@@ -231,16 +260,19 @@ class RenderingContext(ControlContext):
     # __pragma__ ('nokwargs')
 
     def control_key(self):
+        """Compute a cache key from the value's type and current style."""
         t = type(self.value)
         style = self.observe('style') or ""
         return f"{t.__name__}:{t.__module__}-{style}" if t else None
 
     def render_to_container(self):
+        """Clear the container and render the current control into it."""
         self.container.replaceChildren()
         self.control.render(self.container)
 
     @rule(-1)
     def _rule_render_control(self):
+        """Reactive rule that recreates the control when value type or style changes."""
         if self.container is None:
             return
 
@@ -252,7 +284,7 @@ class RenderingContext(ControlContext):
                 self.control.unlink()
             self.control = create_control_factory(self)
             self.render_to_container()
-            fire_event("new-tabs")
+            fire_event("update-tabs")
 
 
 class MixinLiveTracker:
@@ -262,6 +294,7 @@ class MixinLiveTracker:
     timer_id = None
 
     def unlink(self):
+        """Stop polling and delegate to super."""
         self.stop_live()
         super().unlink()
 
@@ -270,6 +303,7 @@ class MixinLiveTracker:
         pass
 
     def stop_live(self):
+        """Cancel the polling interval."""
         if self.timer_id is not None:
             clearInterval(self.timer_id)
             self.timer_id = None
@@ -282,6 +316,7 @@ class MixinLiveTracker:
         return self
 
     def _poll(self):
+        """Check for value changes and update the context."""
         value = self.get_poll_value()
         if self._old_value != value:
             self.context.value = self._old_value = value

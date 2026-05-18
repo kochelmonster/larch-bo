@@ -4,7 +4,9 @@ from gevent import spawn
 def compile_resources(config, force):
     parcel.init(config)
     with linker.Linker(config, force) as linker_:
-        if transpile.make(linker_):  # all done
+        up_to_date = transpile.make(linker_)
+        emit_source_maps = parcel.should_emit_source_maps(config)
+        if up_to_date and (not emit_source_maps or parcel.dist_has_source_maps(config)):
             return linker_
         html.make(linker_)
         parcel.make(linker_)

@@ -36,6 +36,8 @@ def make(package_name, start=__file__):  # pragma: no cover
         sub_path = package_name[:1] + package_name[1:].rsplit("@", 1)[0]
 
     start = Path(start).resolve()
+    if not start.is_dir():
+        start = start.parent
 
     try:
         return find_node_modules_path(sub_path, start)

@@ -189,6 +189,22 @@ class ChunkedEmployees(state.MixinState, selection.MixinToggleSelector,
         console.log("***open", context)
 
 
+@register(Employees, "scrolltip")
+@register(ChunkedEmployees, style="scrolltip")
+class ScrolltipEmployees(Grid):
+    layout = """
+row:|[.scroll_row]@text
+"""
+    scroll_row = Cell(0)
+    
+    @rule
+    def _rule_scrolltip(self):
+        scroll_row = self.context.value.scroll_row
+        yield
+        self.scroll_row = f"{scroll_row + 1}" if scroll_row is not None else ""
+
+
+
 class Frame(Grid):
     employees = Cell()
 

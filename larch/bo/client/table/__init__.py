@@ -1,5 +1,5 @@
 """
-A virtual tree table based on  css grid
+A virtual tree table based on css grid.
 
 The vertical Layout of the grid:
 +---------------------------------------+
@@ -12,22 +12,16 @@ The vertical Layout of the grid:
 | footer (sticky, optional)             |
 +---------------------------------------+
 
-the empty row is responsible to place the footer at the bootom of the containing cell
-if the table is vertically stretched.
-
-
-TODO:
-- force variable record heights
-- page down/end
-- chunked
-
+The empty row is responsible for pushing the footer to the bottom of the
+containing cell when the table is vertically stretched.
 """
 
 import larch.lib.adapter as adapter
 from larch.reactive import rule, Cell, Reactive
 from ..i18n import HTML
-from ..control import Control
+from ..control import Control, ControlContext
 from ..browser import get_metrics
+from ..animate import animator
 from ..js.debounce import debounce
 from .parser import TableParser
 from .provider import TableDataProvider
@@ -43,6 +37,15 @@ def __pragma__(**args): pass
 require("./larch.bo.table.scss")
 
 
+DEBUG = False
+"""Set to True to enable [table] diagnostic logging."""
+
+
+def _log(msg):
+    if DEBUG:
+        console.log(msg)
+
+
 class VirtualHandler:
     """
     Mixin to handle the virtual table mechanism.
@@ -53,9 +56,18 @@ class VirtualHandler:
     would make rows above anchor visible).
 
     Scroll classification:
-    - Near scroll: |delta| <= rendered_count/2 — incremental row recycling
-    - Far scroll: larger jump — full rebuild from pool
+    - Near scroll: |delta| <= max_block_size/2 - incremental row recycling
+    - Far scroll: larger jump - full rebuild from pool
     """
+    VIRTUAL_SCROLL_MAX_PX = 800000
+    """Cap on virtual_scroll_space - empirical browser-friendly upper bound
+    before fractional pixel mapping gets clipped by some engines."""
+
+    SCROLL_TOOLTIP_HIDE_MS = 800
+    SCROLL_TOOLTIP_HEIGHT = 24
+    END_ALIGN_EPSILON_PX = 2
+
+    scroll_row = Cell(0)
 
     def __init__(self, cv):
         super().__init__(cv)
@@ -80,11 +92,36 @@ class VirtualHandler:
         self._expected_scroll_top = None
         """for scroll suppression: expected scrollTop after programmatic changes"""
 
+        self._scroll_tooltip_timer = None
+        self.scroll_tooltip = None
+        self.scroll_tooltip_control = None
+        self._resize_observer = None
+        self._on_scroll_listener = None
+        self._on_wheel_listener = None
+
+    def _init_scroll_tooltip_control(self):
+        self.scroll_tooltip_control = None
+        if self.scroll_tooltip is None:
+            return
+
+        factory = adapter.get(type(self), Control, "scrolltip")
+        if not factory:
+            self.scroll_tooltip.style.display = "none"
+            return
+
+        context = ControlContext(self, self.context, style="scrolltip")
+        self.scroll_tooltip.style.display = ""
+        self.scroll_tooltip.replaceChildren()
+        self.scroll_tooltip_control = factory(context)
+        self.scroll_tooltip_control.render(self.scroll_tooltip)
+
     # --- Scroll event handling ---
 
     def on_scroll(self):
         if not self.is_virtual():
             return
+
+        self._show_scroll_tooltip()
 
         if self._scroll_pending:
             return
@@ -93,9 +130,22 @@ class VirtualHandler:
         window.requestAnimationFrame(self._handle_scroll)
 
     def _on_wheel(self, event):
-        if self.is_virtual():
-            event.preventDefault()
-            self.scrollbar_container.scrollBy(0, event.deltaY)
+        if not self.is_virtual():
+            return
+        delta = event.deltaY
+        if not delta:
+            return
+        # only consume the wheel when the scrollbar can still move in that
+        # direction - otherwise let it bubble for ancestor scrolling
+        max_scroll = (self.scrollbar_container.scrollHeight
+                      - self.scrollbar_container.clientHeight)
+        scroll_top = self.scrollbar_container.scrollTop
+        if delta < 0 and scroll_top <= 0:
+            return
+        if delta > 0 and scroll_top >= max_scroll:
+            return
+        event.preventDefault()
+        self.scrollbar_container.scrollBy(0, delta)
 
     def _handle_scroll(self):
         self._scroll_pending = False
@@ -110,6 +160,17 @@ class VirtualHandler:
         if not self.row_height or not self.row_count:
             return
 
+        max_scroll = (self.scrollbar_container.scrollHeight
+                      - self.scrollbar_container.clientHeight)
+        if max_scroll > 0 and max_scroll - scroll_top <= self.END_ALIGN_EPSILON_PX:
+            end_row = max(0, self.row_count - 1)
+            if self.anchor.row != end_row or self.anchor.bottom is None:
+                self.anchor.row = end_row
+                self.anchor.bottom = 0
+                _log(f"[table] _handle_scroll: end-align row={end_row}")
+                self.fill_virtual_body()
+            return
+
         new_anchor = self._scrolltop_to_anchor(scroll_top)
         if new_anchor == self.first_row:
             if self.anchor.bottom is not None:
@@ -119,42 +180,82 @@ class VirtualHandler:
 
         self.anchor.bottom = None
         delta = abs(new_anchor - self.first_row)
-        mode = "far" if delta > len(self.rows) / 2 else "near"
-        console.log(f"[table] _handle_scroll: scrollTop={scroll_top:.0f} anchor={new_anchor} first_row={self.first_row} delta={delta} mode={mode}")
-        if delta > len(self.rows) / 2:
+        threshold = self.max_block_size / 2
+        if delta > threshold:
+            _log(f"[table] _handle_scroll: anchor={new_anchor} first_row={self.first_row} delta={delta} mode=far")
             self._scroll_far(new_anchor)
         else:
+            _log(f"[table] _handle_scroll: anchor={new_anchor} first_row={self.first_row} delta={delta} mode=near")
             self._scroll_near(new_anchor)
 
     def _scrolltop_to_anchor(self, scroll_top):
         if not self.virtual_scroll_space:
             return 0
-        max_scroll = self.scrollbar_container.scrollHeight - self.scrollbar_container.clientHeight
+        max_scroll = (self.scrollbar_container.scrollHeight
+                      - self.scrollbar_container.clientHeight)
         if max_scroll <= 0:
             return 0
         max_anchor = self.row_count - self.visible_count
         if max_anchor <= 0:
             return 0
+        if max_scroll - scroll_top <= self.END_ALIGN_EPSILON_PX:
+            return max_anchor
         row = int((scroll_top / max_scroll) * max_anchor)
         return max(0, min(row, max_anchor))
 
     def _sync_scrollbar(self):
         if not self.row_count:
             return
-        max_scroll = self.scrollbar_container.scrollHeight - self.scrollbar_container.clientHeight
+        max_scroll = (self.scrollbar_container.scrollHeight
+                      - self.scrollbar_container.clientHeight)
         max_anchor = self.row_count - self.visible_count
         if max_scroll <= 0 or max_anchor <= 0:
             return
         expected = (self.first_row / max_anchor) * max_scroll
-        if abs(expected - self.scrollbar_container.scrollTop) > 1:
+        current = self.scrollbar_container.scrollTop
+        if abs(expected - current) > 1:
             self._expected_scroll_top = expected
             self.scrollbar_container.scrollTop = expected
+        self._show_scroll_tooltip()
+
+    def _show_scroll_tooltip(self):
+        if not self.scroll_tooltip_control or not self.row_count:
+            return
+        max_scroll = (self.scrollbar_container.scrollHeight
+                      - self.scrollbar_container.clientHeight)
+        if max_scroll <= 0:
+            return
+        scroll_top = self.scrollbar_container.scrollTop
+
+        self.scroll_row = self._scrolltop_to_anchor(scroll_top)
+
+        # position vertically to match thumb
+        area_height = self.scrollbar_container.clientHeight
+        ratio = scroll_top / max_scroll
+        top = ratio * (area_height - self.SCROLL_TOOLTIP_HEIGHT)
+        self.scroll_tooltip.style.top = f"{top}px"
+        animator.show(self.scroll_tooltip, True)
+
+        if self._scroll_tooltip_timer:
+            window.clearTimeout(self._scroll_tooltip_timer)
+        self._scroll_tooltip_timer = window.setTimeout(
+            self._hide_scroll_tooltip, self.SCROLL_TOOLTIP_HIDE_MS)
+
+    def _hide_scroll_tooltip(self):
+        self._scroll_tooltip_timer = None
+        if self.scroll_tooltip:
+            animator.show(self.scroll_tooltip, False)
 
     def _apply_anchor_offset(self):
         """Apply pixel-accurate viewport offset for sub-row positioning."""
         self.element.scrollTop = 0
         if self.anchor.bottom is not None:
+            # Use CSS grid alignment to push rows to bottom when needed
+            self.viewport.style.alignContent = "flex-end"
             self._apply_bottom_alignment()
+        else:
+            # Normal top-aligned rendering
+            self.viewport.style.alignContent = "start"
 
     def _apply_bottom_alignment(self):
         """Position anchor.row's bottom flush with viewport bottom."""
@@ -163,18 +264,18 @@ class VirtualHandler:
         start = self.rows[0].lbo_row
         idx = self.anchor.row - start
         if idx < 0 or idx >= len(self.rows):
-            console.log(f"[table] _apply_bottom_alignment: SKIP anchor.row={self.anchor.row} start={start} idx={idx} rows={len(self.rows)}")
+            _log(f"[table] _apply_bottom_alignment: SKIP anchor.row={self.anchor.row} start={start} idx={idx} rows={len(self.rows)}")
             return
         self.element.scrollTop = 0
         row = self.rows[idx]
-        rect = self.element.getBoundingClientRect()
-        max_bottom = rect.bottom - self.footer.height
+        # measure relative to viewport (where the rows live), not the outer
+        # element, so border/padding on .lbo-table does not skew the offset
+        view_rect = self.viewport.getBoundingClientRect()
+        max_bottom = view_rect.bottom - self.footer.height
         row_rect = row.getBoundingClientRect()
         needed = row_rect.bottom - max_bottom + self.anchor.bottom
         if needed > 0.5:
             self.element.scrollTop = needed
-        last_row = self.rows[len(self.rows)-1].lbo_row
-        console.log(f"[table] _apply_bottom_alignment: anchor.row={self.anchor.row} offset={self.anchor.bottom} scrollTop={needed:.1f} rows={start}..{last_row}")
 
     # --- Near scroll (incremental) ---
 
@@ -207,9 +308,8 @@ class VirtualHandler:
                 end_row = min(old_last + need, self.row_count)
                 if end_row > old_last:
                     data = self.provider.request_data(old_last, end_row)
-                    for i in range(len(data)):
-                        data_row = old_last + i
-                        self.render_rows(data_row, len(self.rows), data[i])
+                    for i, record in enumerate(data):
+                        self.render_rows(old_last + i, len(self.rows), record)
 
         else:
             # scroll up: remove rows from end, add at front
@@ -228,8 +328,7 @@ class VirtualHandler:
                 if end_row > start_row:
                     data = self.provider.request_data(start_row, end_row)
                     for i in range(len(data) - 1, -1, -1):
-                        data_row = start_row + i
-                        self.render_rows(data_row, -1, data[i])
+                        self.render_rows(start_row + i, -1, data[i])
 
         # trim excess rows from end
         while len(self.rows) > target_count:
@@ -248,8 +347,7 @@ class VirtualHandler:
 
         self._trim_pool()
         self._update_avg_height()
-        self._sync_scrollbar()
-        self.update_columns()
+        self._update_columns_debounced()
         self._apply_anchor_offset()
         self.updated += 1
 
@@ -259,6 +357,7 @@ class VirtualHandler:
         new_anchor = max(0, min(new_anchor, self.row_count - 1))
         self._clear_body_to_pool()
         self.anchor.row = new_anchor
+        self.anchor.bottom = None
         self.fill_virtual_body()
 
     # --- Body fill ---
@@ -281,17 +380,26 @@ class VirtualHandler:
         self._fill_scheduled = False
         self._clear_body_to_pool()
 
+        # clamp anchor.row defensively
+        max_anchor = max(0, self.row_count - 1)
+        if self.anchor.row > max_anchor:
+            self.anchor.row = max_anchor
+
         if self.anchor.bottom is not None:
             # bottom mode: anchor.row is the row to align at bottom
             self.first_row = max(0, self.anchor.row - self.visible_count)
         else:
             self.first_row = self.anchor.row
 
+        # clamp first_row to a valid range so target_count is never negative
+        if self.first_row > max_anchor:
+            self.first_row = max(0, max_anchor)
+
         target_count = min(
             self.visible_count + self.buffer_below + 1,
             self.row_count - self.first_row)
 
-        console.log(f"[table] fill_virtual_body: anchor.row={self.anchor.row} anchor.bottom={self.anchor.bottom} first_row={self.first_row} target={target_count} row_count={self.row_count} visible={self.visible_count}")
+        _log(f"[table] fill_virtual_body: anchor.row={self.anchor.row} anchor.bottom={self.anchor.bottom} first_row={self.first_row} target={target_count}")
 
         if target_count <= 0:
             self.updated += 1
@@ -301,9 +409,8 @@ class VirtualHandler:
         data_end = min(data_start + target_count, self.row_count)
         data = self.provider.request_data(data_start, data_end)
 
-        for i in range(len(data)):
-            data_row = data_start + i
-            self.render_rows(data_row, len(self.rows), data[i])
+        for i, record in enumerate(data):
+            self.render_rows(data_start + i, len(self.rows), record)
 
         # correct grid positions for all rows
         for grid_row, row_element in enumerate(
@@ -311,9 +418,7 @@ class VirtualHandler:
             self.body.correct_grid_row(row_element, grid_row)
 
         self._update_avg_height()
-        self._set_virtual_scroll_space()
-        self._sync_scrollbar()
-        self.update_columns()
+        self._update_columns_debounced()
         self._apply_anchor_offset()
         self.updated += 1
 
@@ -323,8 +428,8 @@ class VirtualHandler:
         data = self.provider.request_data(0, self.row_count)
 
         self.row_heights = {}  # __:jsiter
-        for i in range(self.row_count):
-            self.row_heights[i] = self.render_rows(i, i, data[i])
+        for i, record in enumerate(data):
+            self.row_heights[i] = self.render_rows(i, i, record)
 
         for grid_row, row_element in enumerate(
                 self.rows, self.header.row_count + 1):
@@ -380,7 +485,7 @@ class VirtualHandler:
         else:
             total = self.row_count * self.row_height
 
-        self.virtual_scroll_space = min(total, 800000)
+        self.virtual_scroll_space = min(total, self.VIRTUAL_SCROLL_MAX_PX)
         self.scroll_row_height = self.virtual_scroll_space / self.row_count
         self.scrollbar_spacer.style.height = f"{self.virtual_scroll_space}px"
 
@@ -406,13 +511,22 @@ class VirtualHandler:
         self.scrollbar_spacer.style.height = "0px"
         self.scrollbar_container.appendChild(self.scrollbar_spacer)
 
+        # Scroll position tooltip
+        self.scroll_tooltip = document.createElement("div")
+        self.scroll_tooltip.classList.add("lbo-scroll-tooltip", "popup")
+
         container.appendChild(el)
+        container.appendChild(self.scroll_tooltip)
         container.appendChild(self.scrollbar_container)
         parent.appendChild(container)
+        self._init_scroll_tooltip_control()
 
-        self.scrollbar_container.addEventListener("scroll", self.on_scroll)
+        self._on_scroll_listener = self.on_scroll
+        self.scrollbar_container.addEventListener(
+            "scroll", self._on_scroll_listener)
+        self._on_wheel_listener = self._on_wheel
         # __pragma__("jsiter")
-        el.addEventListener("wheel", self._on_wheel, {"passive": False})
+        el.addEventListener("wheel", self._on_wheel_listener, {"passive": False})
         # __pragma__("nojsiter")
 
         self.process_layout(self.viewport)
@@ -421,6 +535,8 @@ class VirtualHandler:
         self.element = el
         self.render_frame()
         self.reset_widths()
+        self.header.start()
+        self.footer.start()
         self.start_provider()
 
         # resize observer
@@ -449,9 +565,16 @@ class VirtualHandler:
     def clear(self):
         self._clear_body_to_pool()
         self.row_count = 0
+        self.first_row = 0
         self.anchor.row = 0
         self.anchor.bottom = None
         self.row_heights = {}  # __:jsiter
+        self._scroll_pending = False
+        self._fill_scheduled = False
+        self._expected_scroll_top = None
+        self.columns = None
+        self.virtual_scroll_space = 0
+        self.scrollbar_spacer.style.height = "0px"
 
     def set_row_count(self, count):
         old_count = self.row_count
@@ -462,14 +585,14 @@ class VirtualHandler:
             old_anchor = self.anchor.row
             self.anchor.row = max(0, count - 1)
             self.anchor.bottom = 0
-            console.log(f"[table] set_row_count: anchor clamped {old_anchor}→{self.anchor.row}, bottom=0")
+            _log(f"[table] set_row_count: anchor clamped {old_anchor}->{self.anchor.row}")
 
         if not self.row_height:
             metrics = get_metrics()
             self.row_height = metrics.line_height
 
         is_virtual = self.is_virtual()
-        console.log(f"[table] set_row_count({count}) old={old_count} virtual={is_virtual} anchor.row={self.anchor.row} anchor.bottom={self.anchor.bottom} row_height={self.row_height}")
+        _log(f"[table] set_row_count({count}) old={old_count} virtual={is_virtual} row_height={self.row_height}")
 
         if is_virtual:
             rect = self.element.getBoundingClientRect()
@@ -491,15 +614,6 @@ class VirtualHandler:
         self._set_virtual_scroll_space()
         self.row_heights = {}  # __:jsiter
 
-        # Restore column widths from a previous instance of the same class
-        # so that cached-data re-renders don't lose placeholder sizing.
-        stored = self.__class__._class_column_widths
-        if stored and not self.columns:
-            parts = stored.split(" ")
-            if len(parts) == len(self.stretchers):
-                self.viewport.style["grid-template-columns"] = stored
-                self.columns = stored
-
         self.update_row_templates()
         if is_virtual:
             self.fill_virtual_body()
@@ -510,18 +624,20 @@ class VirtualHandler:
         self._update_avg_height()
 
         if is_virtual:
+            # Lock column widths to measured pixel values so subsequent renders
+            # (placeholders -> real data) don't shift columns. We re-measure
+            # from the current DOM every time, so CSS changes are picked up.
             self.columns = window.getComputedStyle(
                 self.viewport)["grid-template-columns"]
-            # lock all column widths to exact px values
             self.viewport.style["grid-template-columns"] = self.columns
-            self.__class__._class_column_widths = self.columns
-            # recalc with measured heights
+
+            # recalc block size with measured row heights
             old_max = self.max_block_size
             self.visible_count = max(1, int(viewport_height / self.row_height))
             self.buffer_below = self.visible_count
             self.max_block_size = self.visible_count + self.buffer_below + 1
             if self.max_block_size != old_max:
-                console.log(f"[table] set_row_count: post-render recalc max_block {old_max}→{self.max_block_size} visible={self.visible_count} row_height={self.row_height}")
+                _log(f"[table] set_row_count: post-render recalc max_block {old_max}->{self.max_block_size}")
                 self.update_row_templates()
                 self.fill_virtual_body()
 
@@ -535,23 +651,17 @@ class VirtualHandler:
                 if self.footer.row_count else f"repeat({upper_rows}, auto) 1fr")
         self.viewport.style["grid-template-rows"] = rows
 
-    def update_data(self):
-        """Force re-render of all visible rows (used by providers)."""
+    def redraw(self):
+        """Redraw the body. Called by providers when the data set changes
+        (e.g. expansion, sort)."""
         self.fill_body()
 
-    def update_columns(self):
+    def _update_columns(self):
         columns = window.getComputedStyle(
             self.viewport)["grid-template-columns"]
         if columns != self.columns:
             self.columns = columns
             self.viewport.style["grid-template-columns"] = columns
-            self.__class__._class_column_widths = columns
-
-    def update_display(self):
-        """Compatibility method for cursor/selection mixins."""
-        if self.is_virtual():
-            self.fill_body()
-        self.updated += 1
 
     def _on_resize(self):
         if not self.is_virtual() or not self.row_height:
@@ -563,6 +673,7 @@ class VirtualHandler:
         new_visible = max(1, int(viewport_height / self.row_height))
 
         if abs(new_visible - self.visible_count) >= 2:
+            _log(f"[table] _on_resize: visible_count {self.visible_count}->{new_visible}")
             self.visible_count = new_visible
             self.buffer_below = new_visible
             new_max = new_visible + self.buffer_below + 1
@@ -576,6 +687,8 @@ class VirtualHandler:
             self.columns = window.getComputedStyle(
                 self.viewport)["grid-template-columns"]
             self.viewport.style["grid-template-columns"] = self.columns
+            self._set_virtual_scroll_space()
+            self._sync_scrollbar()
 
 
 class TemplateBase:
@@ -611,8 +724,7 @@ class RowTemplate(TemplateBase):
             context = self.contexts[i]
             el.lbo_row = row
             el.lbo_col = i - 1
-            el.style.gridRowStart = str(context.rows[0]+row)
-            el.style.gridRowEnd = str(context.rows[1]+row+1)
+            el.style.gridRow = f"{context.rows[0]+row}/{context.rows[1]+row+1}"
             i += 1
         return clone
 
@@ -626,8 +738,8 @@ class RowTemplate(TemplateBase):
     def correct_grid_row(self, element, row):
         """correct the position of the element in the grid"""
         for c in self.contexts:
-            element.style.gridRowStart = str(c.rows[0]+row)
-            element.style.gridRowEnd = str(c.rows[1]+row+1)
+            # single style write per cell; avoids two synchronous style mutations
+            element.style.gridRow = f"{c.rows[0]+row}/{c.rows[1]+row+1}"
             element = element.nextElementSibling
 
     def move(self, element):
@@ -713,11 +825,26 @@ class FooterTemplate(TemplateBase):
 
 
 class DumyTemplate:
+    """No-op template used when the layout has no header / body / footer.
+    All methods are safe to call and produce no DOM mutations."""
     row_count = 0
     height = 0
+    contexts = []
 
     def start(self):
         pass
+
+    def render(self, row):
+        return __new__(DocumentFragment())
+
+    def render_content(self, element, row):
+        pass
+
+    def correct_grid_row(self, element, row):
+        pass
+
+    def move(self, element):
+        return __new__(DocumentFragment())
 
     def render_into_viewport(self, table):
         pass
@@ -777,7 +904,6 @@ class LayoutHandler:
 
 class Table(VirtualHandler, LayoutHandler, Control):
     STATIC_LIMIT = 200   # below this row_count no virtual list
-    _class_column_widths = None
     row_count = 0
     element = Cell()
     updated = Cell(0)
@@ -787,6 +913,8 @@ class Table(VirtualHandler, LayoutHandler, Control):
         super().__init__(cv)
 
         self.value_painters = {}  # __:jsiter
+        """painter cache keyed by f"{name}|{type_name}" to invalidate when
+        the cell value type changes for the same column."""
         self.render_context = {}  # __:jsiter
 
         self.max_block_size = 100
@@ -812,7 +940,7 @@ class Table(VirtualHandler, LayoutHandler, Control):
         self.fill_body = self.fill_static_body
         """default fill method, overridden in set_row_count"""
 
-        self.update_columns = debounce(self.update_columns, 100)
+        self._update_columns_debounced = debounce(self._update_columns, 100)
 
     def is_virtual(self):
         return self.row_count > self.STATIC_LIMIT
@@ -844,16 +972,19 @@ class Table(VirtualHandler, LayoutHandler, Control):
         self.render_context.value = data
         self.body.render_content(row_element, data_row)
 
-        is_placeholder = bool(data and data.__placeholder__)
+        is_placeholder = bool(
+            data and getattr(data, "__placeholder__", False))
         el = row_element
-        while el:
+        # iterate exactly len(self.body.contexts) cells - this is the fixed
+        # number of elements a row template produces
+        for i in range(len(self.body.contexts)):
+            if not el:
+                break
             if is_placeholder:
                 el.classList.add("placeholder")
             else:
                 el.classList.remove("placeholder")
             el = el.nextElementSibling
-            if el and el.lbo_row != data_row:
-                break
 
         height = row_element.getBoundingClientRect().height
         self.row_heights[data_row] = height
@@ -868,6 +999,7 @@ class Table(VirtualHandler, LayoutHandler, Control):
         last = self.rows[len(self.rows) - 1].lbo_row
         data = self.provider.request_data(first, last + 1)
 
+        cell_count = len(self.body.contexts)
         for i in range(len(self.rows)):
             row_el = self.rows[i]
             data_row = row_el.lbo_row
@@ -881,13 +1013,15 @@ class Table(VirtualHandler, LayoutHandler, Control):
 
                 # remove placeholder styling (real data arrived)
                 el = row_el
-                while el:
+                for j in range(cell_count):
+                    if not el:
+                        break
                     el.classList.remove("placeholder")
                     el = el.nextElementSibling
-                    if el and el.lbo_row != data_row:
-                        break
 
-        self.update_columns()
+        self._update_columns_debounced()
+        if self.is_virtual():
+            self._apply_anchor_offset()
         self.updated += 1
 
     def update_anchor(self):
@@ -908,22 +1042,21 @@ class Table(VirtualHandler, LayoutHandler, Control):
         self.anchor.row = self.rows[0].lbo_row
 
     def render_value(self, element, name, value):
-        painter = self.value_painters[name]
+        # Cache painters per (column name, value type) so a column whose type
+        # changes between rows does not reuse the previous-type painter.
+        key = f"{name}|{type(value).__name__}"
+        painter = self.value_painters[key]
         if painter:
-            try:
-                painter(element, value)
-                return
-            except TypeError:
-                pass
+            painter(element, value)
+            return
 
         try:
-            self.value_painters[name] = painter = adapter.get(
-                type(value), HTML)(None, self.element)
+            painter = adapter.get(type(value), HTML)(None, self.element)
         except Exception as e:
             console.log("no converter for", value,
                         type(value).__name__, repr(e))
-            self.value_painters[name] = painter = adapter.get(
-                str, HTML)(None, self.element)
+            painter = adapter.get(str, HTML)(None, self.element)
+        self.value_painters[key] = painter
         painter(element, value)
 
     def render_header(self, element):
@@ -942,22 +1075,46 @@ class Table(VirtualHandler, LayoutHandler, Control):
         pass
 
     def start_provider(self):
+        """Locate / instantiate the data provider. The provider is responsible
+        for calling table.set_row_count, which triggers the first render."""
         value = self.context.value
         style = self.context.get("style")
         if isinstance(value, TableDataProvider):
-            provider = value
+            value.set_table(self)
         else:
-            provider = adapter.get(type(value), TableDataProvider, style)
+            adapter.get(type(value), TableDataProvider, style).set_table(self)
 
-        provider.set_table(self)
-        self.header.start()
-        self.footer.start()
+    def unlink(self):
+        if self._scroll_tooltip_timer:
+            window.clearTimeout(self._scroll_tooltip_timer)
+            self._scroll_tooltip_timer = None
+        if self.scroll_tooltip_control is not None:
+            self.scroll_tooltip_control.unlink()
+            self.scroll_tooltip_control = None
+        if self._resize_observer is not None:
+            self._resize_observer.disconnect()
+            self._resize_observer = None
+        if self._on_scroll_listener is not None and self.scrollbar_container:
+            self.scrollbar_container.removeEventListener(
+                "scroll", self._on_scroll_listener)
+            self._on_scroll_listener = None
+        if self._on_wheel_listener is not None and self.element:
+            self.element.removeEventListener(
+                "wheel", self._on_wheel_listener)
+            self._on_wheel_listener = None
+        super().unlink()
 
     def get_state(self):
-        """"the tables state"""
+        """the table's state"""
         return {"anchor": self.anchor}  # __:jsiter
 
     def set_state(self, state):
         anchor = (state and state.anchor) or self.anchor
-        self.anchor.row = anchor.row or 0
-        self.anchor.bottom = anchor.bottom if anchor.bottom is not None else None
+        row = anchor.row if anchor.row is not None else 0
+        # clamp defensively - if state arrives before row_count is known,
+        # row_count is 0 and any positive row is out of range; set_row_count
+        # will re-clamp once the count becomes available.
+        if self.row_count and row > self.row_count - 1:
+            row = max(0, self.row_count - 1)
+        self.anchor.row = row
+        self.anchor.bottom = anchor.bottom

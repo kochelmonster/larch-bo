@@ -124,8 +124,9 @@ class Transmitter:
         elif obj["action"] == "error":
             console.warn("an error occured from transmission", obj)
             if obj["id"]:
-                request = self.active_requests.get(obj["id"], None)
-                request.promise.reject(obj["error"])
+                request = self.active_requests.pop(obj["id"], None)
+                if request:
+                    request.promise.reject(obj["error"])
             else:
                 error_requests = list(self.active_requests.values())
                 self.active_requests.clear()

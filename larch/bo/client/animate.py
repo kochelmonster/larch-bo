@@ -13,8 +13,8 @@ __pragma__("ifdef", "noanimation")
 
 
 class NoAnimator:
-    def set_curve(self, short, long, show, hide):
-        pass
+    def set_policy(self, policy_name):
+        return self
 
     def change_style(self, element, style, value, transform=True):
         element.style[style] = value
@@ -22,7 +22,7 @@ class NoAnimator:
 
     def show(self, element, visible):
         if visible:
-            visible = visible if isinstance(visible, str) else ""
+            visible = visible if isinstance(visible, str) else "block"
             return self.change_style(element, "display", visible, False)
         else:
             return self.change_style(element, "display", "none")
@@ -40,7 +40,7 @@ anime = None
 
 __pragma__('js', '{}', '''
 loading_modules.push((async () => {
-    anime = await import("animejs/lib/anime.esm.js");
+    anime = await import("animejs");
 })());
 ''')
 
@@ -51,42 +51,154 @@ class Animator:
     in material. (Unfortunatly I do not find it anymore)
     """
 
-    animation_objects = {
-        ".lbo-grid": ["grid-template-columns", "grid-template-rows"],
-        ".appearing": ["opacity"],
-        ".disappearing": ["opacity"]
+    EASE = "cubicBezier(.42,0,.58,1)"
+    DEFAULT_POLICIES = {
+        "mobile": {
+            "style": {
+                "ease": "cubicBezier(.42,0,.58,1)",
+                "duration": 225,
+            },
+            "show": {
+                "ease": "cubicBezier(.42,0,.58,1)",
+                "duration": 225,
+            },
+            "hide": {
+                "ease": "cubicBezier(.42,0,.58,1)",
+                "duration": 195,
+            },
+            "replace": {
+                "ease": "cubicBezier(.42,0,.58,1)",
+                "duration": 225,
+            },
+            "style_curve": {
+                "short": 225,
+                "long": 300,
+            },
+        },
+        "tablet": {
+            "style": {
+                "ease": "cubicBezier(.42,0,.58,1)",
+                "duration": 292,
+            },
+            "show": {
+                "ease": "cubicBezier(.42,0,.58,1)",
+                "duration": 225,
+            },
+            "hide": {
+                "ease": "cubicBezier(.42,0,.58,1)",
+                "duration": 195,
+            },
+            "replace": {
+                "ease": "cubicBezier(.42,0,.58,1)",
+                "duration": 225,
+            },
+            "style_curve": {
+                "short": 292,
+                "long": 330,
+            },
+        },
+        "default": {
+            "style": {
+                "ease": "cubicBezier(.42,0,.58,1)",
+                "duration": 200,
+            },
+            "show": {
+                "ease": "cubicBezier(.42,0,.58,1)",
+                "duration": 200,
+            },
+            "hide": {
+                "ease": "cubicBezier(.42,0,.58,1)",
+                "duration": 150,
+            },
+            "replace": {
+                "ease": "cubicBezier(.42,0,.58,1)",
+                "duration": 2000,
+            },
+            "style_curve": {
+                "short": 150,
+                "long": 200,
+            },
+        },
     }
 
-    EASE = "cubicBezier(.42,0,.58,1)"
-
     def __init__(self):
-        self.animated_elements = self.styles_changed = None
+        self.animated_elements = self.pending_ops = None
         info = get_info()
         if info["mobile"]:
-            self.set_curve(225, 300, 225, 195)
+            self.set_policy("mobile")
         elif info["tablet"]:
-            self.set_curve(292, 330, 225, 195)
+            self.set_policy("tablet")
         else:
-            self.set_curve(150, 200, 200, 150)
+            self.set_policy("default")
 
-    def set_curve(self, short, long, show, hide):
-        self.time_short = short
-        self.time_long = long
-        self.time_show = show
-        self.time_hide = hide
+    def set_policy(self, policy_name):
+        selected = self.DEFAULT_POLICIES.get(policy_name)
+        if selected is None:
+            selected = self.DEFAULT_POLICIES["default"]
+
+        # __pragma__("jsiter")
+        self.policy = {
+            "style": selected["style"],
+            "show": selected["show"],
+            "hide": selected["hide"],
+            "replace": selected["replace"],
+        }
+        # __pragma__("nojsiter")
 
         # from matrial
+        short = selected["style_curve"]["short"]
+        long = selected["style_curve"]["long"]
         a = (long-short) / 380
         t = short - a*120
         self.calc_animation_duration = lambda size: min(a*size + t, long)
         return self
 
-    def add(self, style, before, after):
-        if self.styles_changed is None:
-            self.styles_changed = []
+    def _policy_for(self, op_kind):
+        return self.policy[op_kind]
+
+    def _add_op(self, op):
+        if self.pending_ops is None:
+            self.pending_ops = []
             executer.add(self.start_animation)
-        self.styles_changed.append([style, before, after])
+        self.pending_ops.append(op)
         return self
+
+    def _queue_style(self, element, style, value, transform=True):
+        # __pragma__("jsiter")
+        return self._add_op({
+            "type": "style",
+            "element": element,
+            "style": style,
+            "value": value,
+            "transform": transform,
+        })
+        # __pragma__("nojsiter")
+
+    def _queue_show(self, element, visible):
+        # __pragma__("jsiter")
+        return self._add_op({
+            "type": "show",
+            "element": element,
+            "visible": visible,
+        })
+        # __pragma__("nojsiter")
+
+    def _queue_hide(self, element):
+        # __pragma__("jsiter")
+        return self._add_op({
+            "type": "hide",
+            "element": element,
+        })
+        # __pragma__("nojsiter")
+
+    def _queue_replace(self, old_, new_):
+        # __pragma__("jsiter")
+        return self._add_op({
+            "type": "replace",
+            "old": old_,
+            "new": new_,
+        })
+        # __pragma__("nojsiter")
 
     def change_style(self, element, style, value, transform=True):
         """
@@ -99,23 +211,11 @@ class Animator:
             transform (bool): If True the style will be set to the old value at
                               the beginning of the transformation and set to value at the end.
         """
-        old_value = element.style[style]
-        if old_value == value:
-            return self
-
         if self.animated_elements is not None:
             element.style[style] = value
             return self
 
-        def set_to_value(finished=False):
-            element.style[style] = value
-            if style == "display":
-                return "hide" if value == "none" else "show"
-
-        def set_to_old():
-            element.style[style] = old_value
-
-        return self.add(style, set_to_old if transform else set_to_value, set_to_value)
+        return self._queue_style(element, style, value, transform)
 
     def show(self, element, visible):
         """
@@ -124,12 +224,21 @@ class Animator:
             element(dom element): the element to manipulate.
             visible (bool/str): if visible is False sets the display style of element to "none".
         """
+        if self.animated_elements is not None:
+            if visible:
+                visible = visible if isinstance(visible, str) else "block"
+                element.style.display = visible
+                element.style.opacity = ""
+            else:
+                element.style.display = "none"
+                element.style.opacity = ""
+            return self
 
         if visible:
-            visible = visible if isinstance(visible, str) else ""
-            return self.change_style(element, "display", visible, False)
+            visible = visible if isinstance(visible, str) else "block"
+            return self._queue_show(element, visible)
         else:
-            return self.change_style(element, "display", "none")
+            return self._queue_hide(element)
 
     def replace(self, old_, new_):
         """
@@ -142,112 +251,168 @@ class Animator:
             old_.remove()
             return self
 
-        old_position = old_.style.position
+        return self._queue_replace(old_, new_)
+
+    def _append_animation(self, animations, element, style_id, before, after, op_kind, duration=None):
+        if before == after or "auto" in before or "auto" in after:
+            return
+        policy = self._policy_for(op_kind)
+        # __pragma__("jsiter")
+        item = {
+            "element": element,
+            "style": style_id,
+            "before": before,
+            "after": after,
+            "duration": policy["duration"] if duration is None else duration,
+            "ease": policy["ease"],
+        }
+        # __pragma__("nojsiter")
+        animations.append(item)
+
+    def _make_show(self, op, animations, finalize):
+        element = op["element"]
+        visible = op["visible"]
+        before_display = getComputedStyle(element).display
+        if before_display != "none":
+            # already visible
+            element.style.display = visible
+            element.style.opacity = ""
+            return
+
+        element.style.display = visible
+        self._append_animation(animations, element, "opacity", "0", "1", "show")
+        element.style.opacity = "0"
+        finalize.append(lambda: _finalize_visible(element, visible))
+
+    def _make_hide(self, op, animations, finalize):
+        element = op["element"]
+        before_display = getComputedStyle(element).display
+        if before_display == "none":
+            element.style.display = "none"
+            element.style.opacity = ""
+            return
+
+        before_opacity = getComputedStyle(element).opacity
+        self._append_animation(animations, element, "opacity", before_opacity, "0", "hide")
+        finalize.append(lambda: _finalize_hidden(element))
+
+    def _make_replace(self, op, animations, finalize):
+        old_ = op["old"]
+        new_ = op["new"]
+        if old_.parentElement is None:
+            return
+
+        self._append_animation(animations, new_, "opacity", "0", "1", "replace")
+        old_opacity = getComputedStyle(old_).opacity
+        self._append_animation(animations, old_, "opacity", old_opacity, "0", "hide")
         new_.style.opacity = "0"
-        new_.classList.add("appearing")
-        old_.classList.add("disappearing")
+        finalize.append(lambda: _finalize_replace(old_, new_))
 
-        def after(finished):
-            new_.style.opacity = ""
-            if finished:
-                new_.classList.remove("appearing")
-                old_.remove()
-            else:
-                old_.style.opacity = "0"
-                old_.style.position = "absolute"
-            return "show"
+    def _make_style(self, op, animations, finalize):
+        element = op["element"]
+        style_id = op["style"]
+        value = op["value"]
+        transform = op["transform"]
 
-        def before():
-            old_.style.position = old_position
+        if style_id == "display":
+            element.style.display = value
+            return
 
-        return self.add("display", before, after)
+        before = getComputedStyle(element)[style_id]
+        element.style[style_id] = value
+        after = getComputedStyle(element)[style_id]
+
+        if before == after or not transform:
+            return
+
+        policy = self._policy_for("style")
+        duration = policy["duration"]
+        delta_size = calc_animation_size(before, after)
+        if delta_size:
+            dp_size = delta_size * 2.22 / get_metrics().pt_height
+            duration = self.calc_animation_duration(dp_size)
+
+        self._append_animation(animations, element, style_id, before, after, "style", duration)
+        element.style[style_id] = before
+        finalize.append(lambda: _finalize_style(element, style_id, value))
 
     def start_animation(self):
-        # read state before styles changes
-        candidates = []
-        for selector, styles in self.animation_objects.items():
-            for element in document.querySelectorAll(selector):
-                calced = getComputedStyle(element)
-                for style_id in styles:
-                    before = calced[style_id]
-                    if "auto" not in before:   # "auto" -> display == "none"
-                        # __pragma__("jsiter")
-                        candidates.append({
-                            "element": element,
-                            "style": style_id,
-                            "before": before,
-                        })
-                        # __pragma__("nojsiter")
+        ops = self.pending_ops
+        if ops is None:
+            return
+        self.pending_ops = None
 
-        showing_objects = False
-        hidding_objects = False
+        animations = []
+        finalize = []
 
-        # apply changes
-        for style_id, before, after in self.styles_changed:
-            action = after(False)
-            if action == "show":
-                showing_objects = True
-            elif action == "hide":
-                hidding_objects = True
-
-        animation_size = 0
-        # read state afterwards
-        animated = []
-        for props in candidates:
-            element = props["element"]
-            style_id = props["style"]
-            calced = getComputedStyle(element)
-            after = calced[style_id]
-            if "auto" not in after and after != props["before"]:
-                props["after"] = after
-                props["restore"] = element.style[style_id]
-                animation_size = max(calc_animation_size(
-                    before, after), animation_size)
-                animated.append(props)
-
-        if len(animated):
-            # calc animation duration
-            if showing_objects:
-                duration = self.time_show
-            elif hidding_objects:
-                duration = self.time_hide
+        for op in ops:
+            op_type = op["type"]
+            if op_type == "show":
+                self._make_show(op, animations, finalize)
+            elif op_type == "hide":
+                self._make_hide(op, animations, finalize)
+            elif op_type == "replace":
+                self._make_replace(op, animations, finalize)
             else:
-                dp_size = animation_size * 2.22 / get_metrics().pt_height
-                duration = self.calc_animation_duration(dp_size)
+                self._make_style(op, animations, finalize)
 
-            self.animated_elements = animated
-            # revert_changes
-            for style, before, after in self.styles_changed:
-                before()
+        if not len(animations):
+            for fn in finalize:
+                fn()
+            self.animated_elements = None
+            return
 
-            # define animation
+        if anime is None:
+            for props in animations:
+                props["element"].style[props["style"]] = props["after"]
+            for fn in finalize:
+                fn()
+            self.animated_elements = None
+            return
+
+        self.animated_elements = animations
+
+        # __pragma__("jsiter")
+        timeline = anime.createTimeline({"defaults": {"ease": self.EASE}})
+        # __pragma__("nojsiter")
+        for props in animations:
             # __pragma__("jsiter")
-            timeline = anime.createTimeline(
-                {"defaults": {"ease": self.EASE,
-                              "duration": duration}})
+            args = {}
+            args[props["style"]] = [props["before"], props["after"]]
+            args["duration"] = props["duration"]
+            args["ease"] = props["ease"]
             # __pragma__("nojsiter")
-            for props in animated:
-                # path error in transctypt!
-                # __pragma__("jsiter")
-                args = {}
-                args[props["style"]] = [props["before"], props["after"]]
-                # __pragma__("nojsiter")
-                timeline.add(props["element"], args, 0)
+            timeline.add(props["element"], args, 0)
+            props["element"].style[props["style"]] = props["before"]
 
-                # set start styles
-                props["element"].style[props["style"]] = props["before"]
+        timeline.then(lambda *_: self._transition_end(finalize))
 
-            timeline.then(self._transition_end)
-        else:
-            self.animated_elements = self.styles_changed = None
-
-    def _transition_end(self):
-        # revert all style settings, changed by animation
-        for style, before, after in self.styles_changed:
-            after(True)
+    def _transition_end(self, finalize):
+        for fn in finalize:
+            fn()
         for props in self.animated_elements:
-            props["element"].style[props["style"]] = props["restore"]
-        self.animated_elements = self.styles_changed = None
+            props["element"].style[props["style"]] = props["after"]
+        self.animated_elements = None
+
+
+def _finalize_visible(element, visible):
+    element.style.display = visible
+    element.style.opacity = ""
+
+
+def _finalize_hidden(element):
+    element.style.display = "none"
+    element.style.opacity = ""
+
+
+def _finalize_replace(old_, new_):
+    new_.style.opacity = ""
+    if old_.parentElement is not None:
+        old_.remove()
+
+
+def _finalize_style(element, style_id, value):
+    element.style[style_id] = value
 
 
 def calc_animation_size(before, after):

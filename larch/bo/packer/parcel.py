@@ -19,6 +19,7 @@ NEEDED_PACKAGES = {"parcel"}
 
 
 require_replace = re.compile("require.*\"(.*?)\"")
+source_map_comment = re.compile(r"\n?//# sourceMappingURL=.*$")
 
 
 QT_BROWSER = {
@@ -39,6 +40,29 @@ PACKAGE_TEMPLATE = {
 }
 
 
+def split_package_spec(spec):
+    if spec.startswith("@"):
+        if spec.count("@") > 1:
+            package, version = spec.rsplit("@", 1)
+            return package, version
+        return spec, "latest"
+
+    if "@" in spec:
+        package, version = spec.rsplit("@", 1)
+        return package, version
+
+    return spec, "latest"
+
+
+def make_dependencies():
+    deps = {}
+    for spec in sorted(NEEDED_PACKAGES):
+        package, version = split_package_spec(spec)
+        if package != "parcel":
+            deps[package] = version
+    return deps
+
+
 def init(config):
     start = Path(config["root"]).parent
     for p in NEEDED_PACKAGES:
@@ -51,6 +75,9 @@ def init(config):
 
 def make_package_json(linker, directory, entry):
     package = loads(dumps(PACKAGE_TEMPLATE))  # deep copy
+    dependencies = make_dependencies()
+    if dependencies:
+        package["dependencies"] = dependencies
 
     if linker.config.get("window"):
         # standalone
@@ -81,8 +108,44 @@ def create_entries(linker):
     return entry_paths
 
 
+def strip_transcrypt_sourcemaps(path):
+    if not path.exists():
+        return
+
+    for file in path.iterdir():
+        if file.suffix == ".map":
+            file.unlink()
+            continue
+
+        if file.suffix != ".js":
+            continue
+
+        code = file.read_text()
+        patched = source_map_comment.sub("", code)
+        if patched != code:
+            file.write_text(patched)
+
+
+def should_emit_source_maps(config):
+    return bool(config.get("debug") or config.get("source_map"))
+
+
+def dist_has_source_maps(config):
+    dist_path = Path(config["resource_path"])
+    if not dist_path.exists():
+        return False
+    return any(dist_path.glob("*.map"))
+
+
 def make(linker):
     logger.info("make parcel %r\n%r", linker.path, linker.config)
+
+    emit_source_maps = should_emit_source_maps(linker.config)
+
+    if not emit_source_maps:
+        strip_transcrypt_sourcemaps(linker.trans_path)
+        if linker.transmitter:
+            strip_transcrypt_sourcemaps(linker.path/"transmitter")
 
     main_name = Path(linker.config["root"]).with_suffix(".js")
     make_package_json(linker, "main", main_name.name)
@@ -91,15 +154,17 @@ def make(linker):
 
     environ = os.environ.copy()
     environ["FORCE_COLOR"] = "3"
-
     for entry in create_entries(linker):
         cmd = (f'npx parcel build {entry} --dist-dir {linker.config["resource_path"]}'
-               f' --cache-dir {linker.config["build_path"]/".parcel-cache"}')
+               f' --cache-dir {linker.config["build_path"]/".parcel-cache"}'
+               ' --public-url ./')
+        if not emit_source_maps:
+            cmd += " --no-source-maps"
         if linker.config.get("debug"):
             cmd += " --no-optimize"
 
         result = subprocess.run(
-            cmd, shell=True, cwd=linker.path, stderr=subprocess.STDOUT, env=environ,
+            cmd, shell=True, cwd=entry.parent, stderr=subprocess.STDOUT, env=environ,
             stdout=subprocess.PIPE, encoding="utf8")
 
         print(cmd)

@@ -6,3 +6,4 @@ __pycache__
 larch_bo.egg-info
 *.log
 *.code-workspace
+node_modules/

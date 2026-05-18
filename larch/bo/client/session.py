@@ -209,7 +209,7 @@ class Session:
         if container is None:
             container = document.body
 
-        document.addEventListener("new-tabs", self._update_tabindex)
+        document.addEventListener("update-tabs", self._update_tabindex)
         if self.transmitter:
             window.addEventListener("hashchange", self._synch_state)
 
